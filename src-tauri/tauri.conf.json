@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "svelte5-starter",
-  "version": "0.9.5",
-  "identifier": "com.svelte5starter.app",
+  "productName": "trivia-party",
+  "version": "0.0.1",
+  "identifier": "com.azabab.triviaparty",
   "build": {
     "frontendDist": "../build",
     "devUrl": "http://localhost:5174",

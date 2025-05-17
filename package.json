@@ -1,8 +1,8 @@
 {
-	"name": "svelte5-starter",
-	"version": "0.9.5",
-	"identifier": "com.svelte5starter.app",
-	"description": "Svelte 5 Starter with Supabase",
+	"name": "trivia-party",
+	"version": "0.0.1",
+	"identifier": "com.azabab.triviaparty",
+	"description": "Trivia Party",
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev --host 0.0.0.0",
@@ -16,7 +16,7 @@
 		"android-reload": "cap run android -l --external --port=5173",
 		"tauri:dev": "tauri dev",
 		"tauri:build": "tauri build",
-        "version": "node scripts/sync-version.js && git add src-tauri/tauri.conf.json src-tauri/Cargo.toml" // <-- Add this line
+		"version": "node scripts/sync-version.js && git add src-tauri/tauri.conf.json src-tauri/Cargo.toml"
 	},
 	"devDependencies": {
 		"@capacitor/cli": "^6.1.2",
