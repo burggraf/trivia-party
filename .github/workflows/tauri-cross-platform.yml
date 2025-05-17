@@ -1,0 +1,402 @@
+name: Tauri Cross-Platform Builds
+
+on:
+  push:
+    branches: [release]
+  # To enable/disable builds for specific platforms, set these to true/false in the workflow_dispatch or push event:
+  # Example: Only build macos-arm by setting ENABLE_MACOS_ARM: true and others to false
+
+  # Platform build toggles (set in job 'if' conditions below)
+
+jobs:
+  build-macos-arm:
+    if: true # set to false to disable this build
+    runs-on: macos-latest
+    env:
+      SUPABASE_URL_ENCRYPTED: ${{ secrets.SUPABASE_URL_ENCRYPTED }}
+      SUPABASE_URL_ENCRYPTION_KEY: ${{ secrets.SUPABASE_URL_ENCRYPTION_KEY }}
+      SUPABASE_ANON_KEY_ENCRYPTED: ${{ secrets.SUPABASE_ANON_KEY_ENCRYPTED }}
+      SUPABASE_ANON_KEY_ENCRYPTION_KEY: ${{ secrets.SUPABASE_ANON_KEY_ENCRYPTION_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Rust (ARM)
+        run: rustup target add aarch64-apple-darwin
+      - name: Install Xcode Command Line Tools # Add this step
+        run: |
+          echo "Attempting to install Xcode Command Line Tools..."
+          sudo xcode-select --install || echo "Xcode Command Line Tools already installed or failed to install."
+          echo "Listing SDKs..."
+          xcodebuild -showsdks || echo "Failed to list SDKs."
+          echo "Checking hdiutil path..."
+          which hdiutil || echo "hdiutil not found."
+      - name: Install dependencies
+        run: pnpm install
+      - name: Install Tauri CLI
+        run: pnpm add -D @tauri-apps/cli
+      - name: Set environment variables from package.json
+        run: |
+          echo "package.json contents:"
+          cat package.json
+          echo "**************"
+          echo "setting env variables"
+          echo "VERSION=$(node -p \"require('./package.json').version\")" >> $GITHUB_ENV
+          echo "NAME=$(node -p \"require('./package.json').name\")" >> $GITHUB_ENV
+          echo "IDENTIFIER=$(node -p \"require('./package.json').identifier\")" >> $GITHUB_ENV
+          echo "DESCRIPTION=$(node -p \"require('./package.json').description\")" >> $GITHUB_ENV
+          export VERSION=$(node -p "require('./package.json').version")
+          export NAME=$(node -p "require('./package.json').name")
+          export IDENTIFIER=$(node -p "require('./package.json').identifier")
+          export DESCRIPTION=$(node -p "require('./package.json').description")
+          echo "Shell VERSION: $VERSION"
+          echo "Shell NAME: $NAME"
+          echo "Shell IDENTIFIER: $IDENTIFIER"
+          echo "Shell DESCRIPTION: $DESCRIPTION"
+      - name: Check environment variables
+        run: |
+          echo "ENV VERSION: ${{ env.VERSION }}"
+          echo "ENV NAME: ${{ env.NAME }}"
+          echo "ENV IDENTIFIER: ${{ env.IDENTIFIER }}"
+          echo "Computed VERSION: $(node -p \"require('./package.json').version\")"
+      - name: Build SvelteKit
+        run: pnpm build
+      - name: Build Tauri (macOS ARM)
+        run: pnpm tauri build --target aarch64-apple-darwin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tauri-macos-arm
+          path: src-tauri/target/aarch64-apple-darwin/release/bundle
+
+  build-macos-intel:
+    if: true # set to false to disable this build
+    runs-on: macos-latest
+    env:
+      SUPABASE_URL_ENCRYPTED: ${{ secrets.SUPABASE_URL_ENCRYPTED }}
+      SUPABASE_URL_ENCRYPTION_KEY: ${{ secrets.SUPABASE_URL_ENCRYPTION_KEY }}
+      SUPABASE_ANON_KEY_ENCRYPTED: ${{ secrets.SUPABASE_ANON_KEY_ENCRYPTED }}
+      SUPABASE_ANON_KEY_ENCRYPTION_KEY: ${{ secrets.SUPABASE_ANON_KEY_ENCRYPTION_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Rust (Intel)
+        run: rustup target add x86_64-apple-darwin
+      - name: Install dependencies
+        run: pnpm install
+      - name: Install Tauri CLI
+        run: pnpm add -D @tauri-apps/cli
+      - name: Build SvelteKit
+        run: pnpm build
+      - name: Build Tauri (macOS Intel)
+        run: pnpm tauri build --target x86_64-apple-darwin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tauri-macos-intel
+          path: src-tauri/target/x86_64-apple-darwin/release/bundle
+
+  build-windows-intel:
+    if: true # set to false to disable this build
+    runs-on: windows-latest
+    env:
+      SUPABASE_URL_ENCRYPTED: ${{ secrets.SUPABASE_URL_ENCRYPTED }}
+      SUPABASE_URL_ENCRYPTION_KEY: ${{ secrets.SUPABASE_URL_ENCRYPTION_KEY }}
+      SUPABASE_ANON_KEY_ENCRYPTED: ${{ secrets.SUPABASE_ANON_KEY_ENCRYPTED }}
+      SUPABASE_ANON_KEY_ENCRYPTION_KEY: ${{ secrets.SUPABASE_ANON_KEY_ENCRYPTION_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Rust (Intel)
+        run: rustup target add x86_64-pc-windows-msvc
+      - name: Install dependencies
+        run: pnpm install
+      - name: Install Tauri CLI
+        run: pnpm add -D @tauri-apps/cli
+      - name: Build SvelteKit
+        run: pnpm build
+      - name: Build Tauri (Windows Intel)
+        run: pnpm tauri build --target x86_64-pc-windows-msvc
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tauri-windows-intel
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle
+
+  build-windows-arm:
+    if: true # set to false to disable this build
+    runs-on: windows-latest
+    env:
+      SUPABASE_URL_ENCRYPTED: ${{ secrets.SUPABASE_URL_ENCRYPTED }}
+      SUPABASE_URL_ENCRYPTION_KEY: ${{ secrets.SUPABASE_URL_ENCRYPTION_KEY }}
+      SUPABASE_ANON_KEY_ENCRYPTED: ${{ secrets.SUPABASE_ANON_KEY_ENCRYPTED }}
+      SUPABASE_ANON_KEY_ENCRYPTION_KEY: ${{ secrets.SUPABASE_ANON_KEY_ENCRYPTION_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Rust (ARM)
+        run: rustup target add aarch64-pc-windows-msvc
+      - name: Install dependencies
+        run: pnpm install
+      - name: Install Tauri CLI
+        run: pnpm add -D @tauri-apps/cli
+      - name: Build SvelteKit
+        run: pnpm build
+      - name: Build Tauri (Windows ARM)
+        run: pnpm tauri build --target aarch64-pc-windows-msvc
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tauri-windows-arm
+          path: src-tauri/target/aarch64-pc-windows-msvc/release/bundle
+
+  build-ubuntu-intel:
+    if: true # set to false to disable this build
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL_ENCRYPTED: ${{ secrets.SUPABASE_URL_ENCRYPTED }}
+      SUPABASE_URL_ENCRYPTION_KEY: ${{ secrets.SUPABASE_URL_ENCRYPTION_KEY }}
+      SUPABASE_ANON_KEY_ENCRYPTED: ${{ secrets.SUPABASE_ANON_KEY_ENCRYPTED }}
+      SUPABASE_ANON_KEY_ENCRYPTION_KEY: ${{ secrets.SUPABASE_ANON_KEY_ENCRYPTION_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Print OS version and search for webkit packages
+        run: |
+          cat /etc/os-release
+          apt-cache search webkit
+      - name: Enable universe repo and install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y software-properties-common
+          sudo add-apt-repository universe
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev pkg-config libglib2.0-dev
+      - name: Install Rust (Intel)
+        run: rustup target add x86_64-unknown-linux-gnu
+      - name: Install dependencies
+        run: pnpm install
+      - name: Install Tauri CLI
+        run: pnpm add -D @tauri-apps/cli
+      - name: Build SvelteKit
+        run: pnpm build
+      - name: Build Tauri (Ubuntu Intel)
+        run: pnpm tauri build --target x86_64-unknown-linux-gnu || echo "Ubuntu Intel build failed"
+      - uses: actions/upload-artifact@v4
+        if: success() && always()
+        with:
+          name: tauri-ubuntu-intel
+          path: src-tauri/target/x86_64-unknown-linux-gnu/release/bundle
+
+  build-ubuntu-arm:
+    if: true # set to false to disable this build
+    runs-on: ubuntu-22.04
+    env:
+      SUPABASE_URL_ENCRYPTED: ${{ secrets.SUPABASE_URL_ENCRYPTED }}
+      SUPABASE_URL_ENCRYPTION_KEY: ${{ secrets.SUPABASE_URL_ENCRYPTION_KEY }}
+      SUPABASE_ANON_KEY_ENCRYPTED: ${{ secrets.SUPABASE_ANON_KEY_ENCRYPTED }}
+      SUPABASE_ANON_KEY_ENCRYPTION_KEY: ${{ secrets.SUPABASE_ANON_KEY_ENCRYPTION_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Print OS version and search for webkit packages
+        run: |
+          cat /etc/os-release
+          apt-cache search webkit
+      - name: Add ARM64 architecture and sources, install ARM64 dependencies
+        run: |
+          sudo dpkg --add-architecture arm64
+          echo "==== BEFORE sources.list and sources.list.d ===="
+          cat /etc/apt/sources.list
+          ls -l /etc/apt/sources.list.d/
+          cat /etc/apt/sources.list.d/* || true
+          echo "==== END BEFORE sources.list and sources.list.d ===="
+          sudo rm -f /etc/apt/sources.list.d/*.list
+          sudo tee /etc/apt/sources.list << EOF
+          deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy main restricted universe multiverse
+          deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy-updates main restricted universe multiverse
+          deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy-backports main restricted universe multiverse
+          deb [arch=amd64] http://security.ubuntu.com/ubuntu jammy-security main restricted universe multiverse
+          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ jammy main restricted universe multiverse
+          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ jammy-updates main restricted universe multiverse
+          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ jammy-backports main restricted universe multiverse
+          deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ jammy-security main restricted universe multiverse
+          EOF
+           # Redirect azure.archive.ubuntu.com to ports.ubuntu.com to fix ARM64 packages
+          echo "185.125.190.39 azure.archive.ubuntu.com" | sudo tee -a /etc/hosts
+          sudo apt-get clean
+          sudo apt-get update
+          echo "==== AFTER sources.list and sources.list.d ===="
+          cat /etc/apt/sources.list
+          ls -l /etc/apt/sources.list.d/
+          cat /etc/apt/sources.list.d/* || true
+          echo "==== END AFTER sources.list and sources.list.d ===="
+          sudo apt-get install -y --no-install-recommends \
+            crossbuild-essential-arm64 \
+            gcc-aarch64-linux-gnu \
+            g++-aarch64-linux-gnu \
+            pkg-config \
+            libgtk-3-dev:arm64 \
+            libwebkit2gtk-4.1-dev:arm64 \
+            libayatana-appindicator3-dev:arm64 \
+            librsvg2-dev:arm64 \
+            patchelf
+      - name: Set up cross-compilation environment
+        run: |
+          sudo tee /usr/local/bin/aarch64-linux-gnu-pkg-config << 'EOF' > /dev/null
+          #!/bin/sh
+          export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig
+          export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig
+          export PKG_CONFIG_SYSROOT_DIR=/
+          export PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1
+          export PKG_CONFIG_ALLOW_SYSTEM_LIBS=1
+          exec pkg-config "$@"
+          EOF
+          sudo chmod +x /usr/local/bin/aarch64-linux-gnu-pkg-config
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig" >> $GITHUB_ENV
+          echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
+          echo "PKG_CONFIG=/usr/local/bin/aarch64-linux-gnu-pkg-config" >> $GITHUB_ENV
+      - name: Install Rust (ARM)
+        run: rustup target add aarch64-unknown-linux-gnu
+      - name: Install dependencies
+        run: pnpm install
+      - name: Install Tauri CLI
+        run: pnpm add -D @tauri-apps/cli
+      - name: Build SvelteKit
+        run: pnpm build
+      - name: Build Tauri (Ubuntu ARM)
+        run: pnpm tauri build --target aarch64-unknown-linux-gnu || echo "Ubuntu ARM build failed"
+      - uses: actions/upload-artifact@v4
+        if: success() && always()
+        with:
+          name: tauri-ubuntu-arm
+          path: src-tauri/target/aarch64-unknown-linux-gnu/release/bundle
+
+  release:
+    needs:
+      - build-macos-arm
+      - build-macos-intel
+      - build-windows-intel
+      - build-windows-arm
+      - build-ubuntu-intel
+      - build-ubuntu-arm
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Set environment variables from package.json
+        run: |
+          echo "package.json contents:"
+          cat package.json
+          echo "**************"
+          echo "setting env variables"
+          VERSION=$(node -p "require('./package.json').version")
+          NAME=$(node -p "require('./package.json').name")
+          IDENTIFIER=$(node -p "require('./package.json').identifier")
+          DESCRIPTION=$(node -p "require('./package.json').description")
+
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "NAME=$NAME" >> $GITHUB_ENV
+          echo "IDENTIFIER=$IDENTIFIER" >> $GITHUB_ENV
+          echo "DESCRIPTION=$DESCRIPTION" >> $GITHUB_ENV
+
+          echo "Variables set:"
+          echo "VERSION: $VERSION"
+          echo "NAME: $NAME"
+          echo "IDENTIFIER: $IDENTIFIER"
+          echo "DESCRIPTION: $DESCRIPTION"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Zip artifacts if present and rename
+        run: |
+          # Define mappings from original dir name to platform suffix
+          declare -A platform_map
+          platform_map["tauri-macos-arm"]="macos-arm"
+          platform_map["tauri-macos-intel"]="macos-intel"
+          platform_map["tauri-windows-arm"]="windows-arm"
+          platform_map["tauri-windows-intel"]="windows-intel"
+          platform_map["tauri-ubuntu-arm"]="ubuntu-arm"
+          platform_map["tauri-ubuntu-intel"]="ubuntu-intel"
+
+          for dir in "${!platform_map[@]}"; do
+            if [ -d "artifacts/$dir" ]; then
+              platform_suffix="${platform_map[$dir]}"
+              zip_name="${{ env.NAME }}-${{ env.VERSION }}-${platform_suffix}.zip"
+              echo "Zipping artifacts/$dir to $zip_name"
+              cd "artifacts/$dir"
+              zip -r "../../$zip_name" .
+              cd - > /dev/null
+            else
+              echo "Directory artifacts/$dir not found, skipping zip."
+            fi
+          done
+
+
+      - name: Check environment variables
+        run: |
+          echo "ENV VERSION: ${{ env.VERSION }}"
+          echo "ENV NAME: ${{ env.NAME }}"
+          echo "ENV IDENTIFIER: ${{ env.IDENTIFIER }}"
+          # Removed the line below as it causes syntax errors on the Ubuntu runner
+          # echo "Computed VERSION: $(node -p \"require('./package.json').version\")"
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: "${{ env.NAME }}-${{ env.VERSION }}-release-${{ github.run_number }}"
+          release_name: "${{ env.DESCRIPTION }}"
+          draft: false
+          prerelease: false
+
+      - name: Upload artifacts to Release
+        run: |
+          TAG_NAME="${{ env.NAME }}-${{ env.VERSION }}-release-${{ github.run_number }}" # Define the correct tag name
+          echo "Uploading artifacts to tag: $TAG_NAME"
+          for zip in tauri-macos-arm.zip tauri-macos-intel.zip tauri-windows-intel.zip tauri-windows-arm.zip tauri-ubuntu-intel.zip tauri-ubuntu-arm.zip; do
+            if [ -f "$zip" ]; then
+              echo "Uploading $zip..."
+              gh release upload "$TAG_NAME" "$zip" --clobber # Use the correct tag name variable
+            else
+              echo "Skipping $zip, file not found."
+            fi
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
