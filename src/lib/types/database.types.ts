@@ -430,6 +430,54 @@ export type Database = {
           },
         ]
       }
+      questions: {
+        Row: {
+          a: string | null
+          b: string | null
+          c: string | null
+          category: string | null
+          created_at: string | null
+          d: string | null
+          difficulty: string | null
+          id: string
+          level: number | null
+          metadata: Json | null
+          question: string | null
+          subcategory: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          a?: string | null
+          b?: string | null
+          c?: string | null
+          category?: string | null
+          created_at?: string | null
+          d?: string | null
+          difficulty?: string | null
+          id: string
+          level?: number | null
+          metadata?: Json | null
+          question?: string | null
+          subcategory?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          a?: string | null
+          b?: string | null
+          c?: string | null
+          category?: string | null
+          created_at?: string | null
+          d?: string | null
+          difficulty?: string | null
+          id?: string
+          level?: number | null
+          metadata?: Json | null
+          question?: string | null
+          subcategory?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           amount: number
