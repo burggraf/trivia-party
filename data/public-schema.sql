@@ -485,6 +485,30 @@ COMMENT ON TABLE "public"."properties_contacts" IS 'people associated with a pro
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."questions" (
+    "id" "text" NOT NULL,
+    "category" "text",
+    "subcategory" "text",
+    "difficulty" "text",
+    "question" "text",
+    "a" "text",
+    "b" "text",
+    "c" "text",
+    "d" "text",
+    "level" numeric,
+    "metadata" "jsonb",
+    "created_at" timestamp with time zone,
+    "updated_at" timestamp with time zone
+);
+
+
+ALTER TABLE "public"."questions" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."questions" IS 'trivia questions';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."transactions" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "parentid" "uuid",
@@ -583,6 +607,11 @@ ALTER TABLE ONLY "public"."properties_contacts"
 
 ALTER TABLE ONLY "public"."properties"
     ADD CONSTRAINT "properties_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."questions"
+    ADD CONSTRAINT "questions_pkey" PRIMARY KEY ("id");
 
 
 
@@ -817,6 +846,9 @@ ALTER TABLE "public"."properties" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."properties_contacts" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."questions" ENABLE ROW LEVEL SECURITY;
+
+
 CREATE POLICY "recipient can update" ON "public"."messages_recipients" FOR UPDATE USING (("recipient" = ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK (("recipient" = ( SELECT "auth"."uid"() AS "uid")));
 
 
@@ -894,6 +926,8 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."accept_invite"("invite_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."accept_invite"("invite_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."accept_invite"("invite_id" "uuid") TO "service_role";
 
 
@@ -922,6 +956,8 @@ GRANT ALL ON FUNCTION "public"."get_org_role_for_user"("org_id" "uuid", "user_id
 
 
 
+GRANT ALL ON FUNCTION "public"."get_org_users"("org_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_org_users"("org_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_org_users"("org_id" "uuid") TO "service_role";
 
 
@@ -944,6 +980,8 @@ GRANT ALL ON FUNCTION "public"."is_backup_running"() TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."reject_invite"("invite_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."reject_invite"("invite_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."reject_invite"("invite_id" "uuid") TO "service_role";
 
 
@@ -999,6 +1037,12 @@ GRANT ALL ON TABLE "public"."properties" TO "service_role";
 GRANT ALL ON TABLE "public"."properties_contacts" TO "anon";
 GRANT ALL ON TABLE "public"."properties_contacts" TO "authenticated";
 GRANT ALL ON TABLE "public"."properties_contacts" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."questions" TO "anon";
+GRANT ALL ON TABLE "public"."questions" TO "authenticated";
+GRANT ALL ON TABLE "public"."questions" TO "service_role";
 
 
 
