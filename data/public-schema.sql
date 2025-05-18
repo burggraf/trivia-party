@@ -509,6 +509,21 @@ COMMENT ON TABLE "public"."questions" IS 'trivia questions';
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."teams" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "orgid" "uuid",
+    "team_name" "text"
+);
+
+
+ALTER TABLE "public"."teams" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."teams" IS 'teams for trivia party events';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."transactions" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "parentid" "uuid",
@@ -615,6 +630,11 @@ ALTER TABLE ONLY "public"."questions"
 
 
 
+ALTER TABLE ONLY "public"."teams"
+    ADD CONSTRAINT "teams_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."transactions_events"
     ADD CONSTRAINT "transactions_events_pkey" PRIMARY KEY ("id");
 
@@ -630,6 +650,10 @@ CREATE INDEX "orgs_users_orgid_idx" ON "public"."orgs_users" USING "btree" ("org
 
 
 CREATE INDEX "orgs_users_userid_idx" ON "public"."orgs_users" USING "btree" ("userid");
+
+
+
+CREATE INDEX "teams_orgid_idx" ON "public"."teams" USING "btree" ("orgid");
 
 
 
@@ -703,6 +727,11 @@ ALTER TABLE ONLY "public"."properties_contacts"
 
 
 
+ALTER TABLE ONLY "public"."teams"
+    ADD CONSTRAINT "teams_orgid_fkey" FOREIGN KEY ("orgid") REFERENCES "public"."orgs"("id") ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."transactions"
     ADD CONSTRAINT "transactions_contactid_fkey" FOREIGN KEY ("contactid") REFERENCES "public"."contacts"("id") ON DELETE CASCADE;
 
@@ -743,6 +772,26 @@ ALTER TABLE ONLY "public"."transactions"
 
 
 
+CREATE POLICY "Admin and Manager can delete teams" ON "public"."teams" FOR SELECT USING ((( SELECT "orgs_users"."user_role"
+   FROM "public"."orgs_users"
+  WHERE (("orgs_users"."orgid" = "teams"."orgid") AND ("orgs_users"."userid" = ( SELECT "auth"."uid"() AS "uid")))) = ANY (ARRAY['Admin'::"text", 'Manager'::"text"])));
+
+
+
+CREATE POLICY "Admin and Manager can update teams" ON "public"."teams" FOR UPDATE USING ((( SELECT "orgs_users"."user_role"
+   FROM "public"."orgs_users"
+  WHERE (("orgs_users"."orgid" = "teams"."orgid") AND ("orgs_users"."userid" = ( SELECT "auth"."uid"() AS "uid")))) = ANY (ARRAY['Admin'::"text", 'Manager'::"text"]))) WITH CHECK ((( SELECT "orgs_users"."user_role"
+   FROM "public"."orgs_users"
+  WHERE (("orgs_users"."orgid" = "teams"."orgid") AND ("orgs_users"."userid" = ( SELECT "auth"."uid"() AS "uid")))) = ANY (ARRAY['Admin'::"text", 'Manager'::"text"])));
+
+
+
+CREATE POLICY "Admin and Manager roles can create teams" ON "public"."teams" FOR INSERT WITH CHECK ((( SELECT "orgs_users"."user_role"
+   FROM "public"."orgs_users"
+  WHERE (("orgs_users"."orgid" = "teams"."orgid") AND ("orgs_users"."userid" = ( SELECT "auth"."uid"() AS "uid")))) = ANY (ARRAY['Admin'::"text", 'Manager'::"text"])));
+
+
+
 CREATE POLICY "Insert - user must be sender" ON "public"."messages" FOR INSERT TO "authenticated" WITH CHECK (("auth"."uid"() = "sender"));
 
 
@@ -764,6 +813,12 @@ CREATE POLICY "admin or invitee can delete an invite" ON "public"."orgs_invites"
 
 
 CREATE POLICY "admin or invitee can view invite" ON "public"."orgs_invites" FOR SELECT TO "authenticated" USING ((("created_by" = ( SELECT "auth"."uid"() AS "uid")) OR ("email" = ( SELECT "auth"."email"() AS "email"))));
+
+
+
+CREATE POLICY "all org users can view teams" ON "public"."teams" FOR SELECT USING ((( SELECT "auth"."uid"() AS "uid") IN ( SELECT "orgs_users"."orgid"
+   FROM "public"."orgs_users"
+  WHERE ("orgs_users"."orgid" = "teams"."orgid"))));
 
 
 
@@ -873,6 +928,9 @@ CREATE POLICY "sender or recipient can select" ON "public"."messages_recipients"
 
 CREATE POLICY "sender or recipients can view" ON "public"."messages" FOR SELECT USING (true);
 
+
+
+ALTER TABLE "public"."teams" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."transactions" ENABLE ROW LEVEL SECURITY;
@@ -1043,6 +1101,12 @@ GRANT ALL ON TABLE "public"."properties_contacts" TO "service_role";
 GRANT ALL ON TABLE "public"."questions" TO "anon";
 GRANT ALL ON TABLE "public"."questions" TO "authenticated";
 GRANT ALL ON TABLE "public"."questions" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."teams" TO "anon";
+GRANT ALL ON TABLE "public"."teams" TO "authenticated";
+GRANT ALL ON TABLE "public"."teams" TO "service_role";
 
 
 
