@@ -5,3 +5,12 @@
 
 # you can comment the following line out
 config.toml
+
+# Supabase
+.branches
+.temp
+
+# dotenvx
+.env.keys
+.env.local
+.env.*.local
