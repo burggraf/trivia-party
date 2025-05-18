@@ -53,7 +53,7 @@
               >
                 <button
                   type="button"
-                  on:click={() => handleButtonClick(btn.value)}
+                  onclick={() => handleButtonClick(btn.value)}
                 >
                   {btn.label}
                 </button>
@@ -62,7 +62,7 @@
               <AlertDialogCancel class="border" asChild>
                 <button
                   type="button"
-                  on:click={() => handleButtonClick(btn.value)}
+                  onclick={() => handleButtonClick(btn.value)}
                 >
                   {btn.label}
                 </button>
@@ -71,7 +71,7 @@
               <button
                 type="button"
                 class="btn"
-                on:click={() => handleButtonClick(btn.value)}
+                onclick={() => handleButtonClick(btn.value)}
               >
                 {btn.label}
               </button>
@@ -79,7 +79,7 @@
           {/each}
         {:else}
           <AlertDialogAction asChild>
-            <button type="button" on:click={() => handleButtonClick("ok")}>
+            <button type="button" onclick={() => handleButtonClick("ok")}>
               OK
             </button>
           </AlertDialogAction>

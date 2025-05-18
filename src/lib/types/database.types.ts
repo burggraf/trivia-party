@@ -478,6 +478,38 @@ export type Database = {
         }
         Relationships: []
       }
+      teams: {
+        Row: {
+          created_at: string
+          id: string
+          metadata: Json | null
+          team_name: string
+          orgid: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          team_name: string
+          orgid: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          team_name?: string
+          orgid?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teams_orgid_fkey"
+            columns: ["orgid"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       transactions: {
         Row: {
           amount: number

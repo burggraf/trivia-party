@@ -244,7 +244,7 @@
       </div>
 
       <Dialog.Footer>
-        <Button variant="outline" on:click={() => (isOpen = false)}
+        <Button variant="outline" onclick={() => (isOpen = false)}
           >Cancel</Button
         >
       </Dialog.Footer>
