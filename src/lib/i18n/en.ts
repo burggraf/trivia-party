@@ -22,6 +22,7 @@ export default {
     people: {
       title: "People",
       contacts: "Contacts",
+      teams: "Teams",
     },
     properties: {
       title: "Properties",

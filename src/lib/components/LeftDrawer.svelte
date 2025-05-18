@@ -54,6 +54,10 @@
           title: $t("menu.people.contacts"),
           url: "/contacts",
         },
+        {
+          title: $t("menu.people.teams"),
+          url: "/teams",
+        },
       ],
     },
     {

@@ -15,6 +15,7 @@ export default {
     people: {
       title: "Personas",
       contacts: "Contactos",
+      teams: "Equipos",
     },
     properties: {
       title: "Propiedades",
