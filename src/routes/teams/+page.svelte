@@ -182,7 +182,7 @@
                       variant="ghost"
                       size="icon"
                       title="Edit Team"
-                      onclick={() => goto(`/teams/${team.id}/edit`)}
+                      onclick={() => goto(`/teams/${team.id}`)}
                     >
                       <Edit class="h-4 w-4" />
                     </Button>
