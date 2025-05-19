@@ -22,7 +22,6 @@ export default {
     people: {
       title: "People",
       contacts: "Contacts",
-      teams: "Teams",
       parties: "Parties",
     },
     properties: {
