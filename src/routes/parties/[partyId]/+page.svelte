@@ -26,34 +26,34 @@
   let error = $state<string | null>(null);
   let unauthorized = $state(false);
 
-  // For date input, Svelte needs date in 'yyyy-MM-dd' format
-  // Commenting out party_date until correct field name is known
-  /*
-  let partyDateForInput = $derived({
-    get: () => party.party_date ? new Date(party.party_date).toISOString().split('T')[0] : '',
-    set: (value: string) => {
-      party.party_date = value ? new Date(value).toISOString() : undefined;
-    }
-  });
-  */
+  let startTimeForInput = $state('');
+  let endTimeForInput = $state('');
 
-  // For date input, Svelte needs date in 'yyyy-MM-ddTHH:mm' format for datetime-local
-  // Commenting out party_date until correct field name is known
-  
-  let startTimeForInput = $derived({
-    get: () => party.starttime ? new Date(new Date(party.starttime).getTime() - new Date(party.starttime).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '',
-    set: (value: string) => {
-      party.starttime = value ? new Date(value).toISOString() : undefined;
+  // Sync party.starttime/endtime with input fields
+  $effect(() => {
+    if (party.starttime) {
+      startTimeForInput = new Date(new Date(party.starttime).getTime() - new Date(party.starttime).getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    } else {
+      startTimeForInput = ''; // Reset if party.starttime is cleared
     }
   });
 
-  let endTimeForInput = $derived({
-    get: () => party.endtime ? new Date(new Date(party.endtime).getTime() - new Date(party.endtime).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '',
-    set: (value: string) => {
-      party.endtime = value ? new Date(value).toISOString() : undefined;
+  $effect(() => {
+    if (party.endtime) {
+      endTimeForInput = new Date(new Date(party.endtime).getTime() - new Date(party.endtime).getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    } else {
+      endTimeForInput = ''; // Reset if party.endtime is cleared
     }
   });
-  
+
+  // Sync input fields back to party.starttime/endtime
+  $effect(() => {
+    party.starttime = startTimeForInput ? new Date(startTimeForInput).toISOString() : undefined;
+  });
+
+  $effect(() => {
+    party.endtime = endTimeForInput ? new Date(endTimeForInput).toISOString() : undefined;
+  });
 
   const showPageActions = $derived(
     currentUserIsAdminOrManager && !unauthorized,
@@ -75,6 +75,8 @@
       pageTitle = "New Party";
       // Initialize with default values, especially for required fields if any
       party = { title: "", location: "" }; 
+      startTimeForInput = ''; // Clear input fields for new party
+      endTimeForInput = '';   // Clear input fields for new party
       loading = false;
     } else {
       pageTitle = "Edit Party";
@@ -84,6 +86,7 @@
         toast.error("Error loading party", { description: error });
       } else if (data) {
         party = data;
+        // startTimeForInput and endTimeForInput will be set by the $effect above
       } else {
         error = "Party not found.";
         toast.error("Error", { description: error });
@@ -181,19 +184,6 @@
               required
             />
           </div>
-
-          <!-- Commenting out party_date field until correct field name is known -->
-          <!--
-          <div>
-            <Label for="partyDate">Party Date (Optional)</Label>
-            <Input 
-              id="partyDate" 
-              type="date" 
-              bind:value={partyDateForInput} 
-              disabled={unauthorized || loading} 
-            />
-          </div>
-          -->
 
           <div>
             <Label for="partyStartTime">Start Time (Optional)</Label>
