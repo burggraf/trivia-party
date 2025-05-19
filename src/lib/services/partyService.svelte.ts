@@ -26,7 +26,7 @@ export const getParties = async () => {
         return { data: null, error: new Error("No organization selected") };
     }
     const { data, error } = await supabase.from("parties").select(
-        "id, title, location, orgid, created_at, starttime, endtime",
+        "id, title, location, orgid, created_at, starttime, endtime, notes, teamsize"
     ).eq("orgid", currentOrg.id)
         .order("title", { ascending: true });
 

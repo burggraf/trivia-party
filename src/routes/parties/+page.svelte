@@ -2,7 +2,10 @@
   import PageTemplate from "$lib/components/PageTemplate.svelte";
   import { Plus, Search, Edit, Trash2 } from "lucide-svelte";
   import type { Party } from "$lib/services/partyService.svelte.ts";
-  import { getParties, deleteParty } from "$lib/services/partyService.svelte.ts";
+  import {
+    getParties,
+    deleteParty,
+  } from "$lib/services/partyService.svelte.ts";
   import { getCurrentOrg } from "$lib/services/backend.svelte.ts";
   import { goto } from "$app/navigation";
   import {
@@ -120,24 +123,32 @@
   {#snippet Middle()}
     {#if loading}
       <div class="flex items-center justify-center h-full">
-        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div
+          class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"
+        ></div>
       </div>
     {:else if error}
       <div class="flex items-center justify-center h-full text-destructive">
         <p>{error}</p>
       </div>
     {:else if parties.length === 0}
-      <div class="flex flex-col items-center justify-center h-full text-muted-foreground">
+      <div
+        class="flex flex-col items-center justify-center h-full text-muted-foreground"
+      >
         <p>No parties yet.</p>
         {#if currentUserIsAdminOrManager}
-          <p class="text-sm">Click the "Add Party" button to create your first party.</p>
+          <p class="text-sm">
+            Click the "Add Party" button to create your first party.
+          </p>
         {/if}
       </div>
     {:else}
       <div class="p-4 space-y-4">
-        {#if parties.length > 3} // Show search only if more than 3 parties
+        {#if parties.length > 3}
           <div class="relative">
-            <Search class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search
+              class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground"
+            />
             <Input
               type="search"
               placeholder="Search parties..."
@@ -160,7 +171,9 @@
             {#each filteredParties as party (party.id)}
               <TableRow>
                 <TableCell>
-                  <div class="font-medium">{party.title || "Unnamed Party"}</div>
+                  <div class="font-medium">
+                    {party.title || "Unnamed Party"}
+                  </div>
                   <!-- Display other party info like date/location here if desired -->
                   <!-- Commenting out party_date until correct field name is known -->
                   {#if party.starttime}
@@ -168,9 +181,11 @@
                       Starts: {new Date(party.starttime).toLocaleString()}
                     </div>
                   {/if}
-                  
+
                   {#if party.location}
-                    <div class="text-sm text-muted-foreground">{party.location}</div>
+                    <div class="text-sm text-muted-foreground">
+                      {party.location}
+                    </div>
                   {/if}
                 </TableCell>
                 {#if currentUserIsAdminOrManager}
@@ -209,12 +224,17 @@
           <AlertDialog.Header>
             <AlertDialog.Title>Are you sure?</AlertDialog.Title>
             <AlertDialog.Description>
-              This action cannot be undone. This will permanently delete the party
-              "<strong>{partyToDelete.title || 'Unnamed Party'}</strong>".
+              This action cannot be undone. This will permanently delete the
+              party "<strong>{partyToDelete.title || "Unnamed Party"}</strong>".
             </AlertDialog.Description>
           </AlertDialog.Header>
           <AlertDialog.Footer>
-            <AlertDialog.Cancel onclick={() => { partyToDelete = null; showDeleteConfirm = false; }}>Cancel</AlertDialog.Cancel>
+            <AlertDialog.Cancel
+              onclick={() => {
+                partyToDelete = null;
+                showDeleteConfirm = false;
+              }}>Cancel</AlertDialog.Cancel
+            >
             <AlertDialog.Action
               onclick={() => handleDeleteParty(partyToDelete!.id!)}
               class="bg-destructive text-destructive-foreground hover:bg-destructive/90"

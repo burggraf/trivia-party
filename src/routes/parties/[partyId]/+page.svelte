@@ -8,6 +8,7 @@
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
+  import Textarea from "$lib/components/ui/textarea/textarea.svelte"; // Import Textarea as default
   import { goto, invalidateAll } from "$app/navigation";
   import { toast } from "svelte-sonner";
 
@@ -55,6 +56,16 @@
     party.endtime = endTimeForInput ? new Date(endTimeForInput).toISOString() : undefined;
   });
 
+  // Ensure notes and teamsize are initialized
+  $effect(() => {
+    if (party && party.notes === undefined) {
+      party.notes = null;
+    }
+    if (party && party.teamsize === undefined) {
+      party.teamsize = null;
+    }
+  });
+
   const showPageActions = $derived(
     currentUserIsAdminOrManager && !unauthorized,
   );
@@ -73,8 +84,8 @@
 
     if (isNew) {
       pageTitle = "New Party";
-      // Initialize with default values, especially for required fields if any
-      party = { title: "", location: "" }; 
+      // Initialize with default values
+      party = { title: "", location: "", notes: null, teamsize: null }; 
       startTimeForInput = ''; // Clear input fields for new party
       endTimeForInput = '';   // Clear input fields for new party
       loading = false;
@@ -202,6 +213,27 @@
               type="datetime-local" 
               bind:value={endTimeForInput} 
               disabled={unauthorized || loading} 
+            />
+          </div>
+
+          <div>
+            <Label for="teamsize">Team Size (Optional)</Label>
+            <Input 
+              id="teamsize" 
+              type="number" 
+              bind:value={party.teamsize} 
+              disabled={unauthorized || loading} 
+              placeholder="e.g., 4"
+            />
+          </div>
+
+          <div>
+            <Label for="notes">Notes (Optional)</Label>
+            <Textarea 
+              id="notes" 
+              bind:value={party.notes} 
+              disabled={unauthorized || loading} 
+              placeholder="Enter any notes for the party..."
             />
           </div>
 
