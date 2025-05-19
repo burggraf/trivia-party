@@ -1,6 +1,6 @@
 <script lang="ts">
   import PageTemplate from "$lib/components/PageTemplate.svelte";
-  import { Plus, Search, Edit, Trash2 } from "lucide-svelte";
+  import { Plus, Search, Trash2 } from "lucide-svelte";
   import type { Party } from "$lib/services/partyService.svelte.ts";
   import {
     getParties,
@@ -18,7 +18,7 @@
   } from "$lib/components/ui/table";
   import { Input } from "$lib/components/ui/input";
   import { Button } from "$lib/components/ui/button";
-  import * as AlertDialog from "$lib/components/ui/alert-dialog";
+  import { alertManager } from "$lib/services/alertManager.svelte";
   import { toast } from "svelte-sonner";
 
   const currentOrg = $derived(getCurrentOrg());
@@ -49,8 +49,6 @@
   let parties = $state<Party[]>([]);
   let filteredParties = $state<Party[]>([]);
   let searchQuery = $state("");
-  let partyToDelete = $state<Party | null>(null);
-  let showDeleteConfirm = $state(false);
   let searchTimeout: ReturnType<typeof setTimeout>;
   let loading = $state(true);
   let error = $state<string | null>(null);
@@ -86,7 +84,6 @@
     } else {
       toast.success("Party deleted successfully");
       await loadParties(); // Refresh the list
-      showDeleteConfirm = false; // Close dialog
     }
   }
 
@@ -161,7 +158,6 @@
           <TableHeader>
             <TableRow>
               <TableHead class="w-[70%]">Name</TableHead>
-              <!-- Add other headers like Party Date, Location if needed -->
               {#if currentUserIsAdminOrManager}
                 <TableHead class="w-[30%] text-right">Actions</TableHead>
               {/if}
@@ -183,8 +179,6 @@
                   <div class="font-medium">
                     {party.title || "Unnamed Party"}
                   </div>
-                  <!-- Display other party info like date/location here if desired -->
-                  <!-- Commenting out party_date until correct field name is known -->
                   {#if party.starttime}
                     <div class="text-sm text-muted-foreground">
                       Starts: {new Date(party.starttime).toLocaleString()}
@@ -203,10 +197,24 @@
                       variant="ghost"
                       size="icon"
                       title="Delete Party"
-                      onclick={(event: Event) => {
+                      onclick={async (event: Event) => {
                         event.stopPropagation(); // Prevent row click from firing
-                        partyToDelete = party;
-                        showDeleteConfirm = true;
+                        const result = await alertManager.show({
+                          title: "Confirm Delete Party",
+                          message: `Are you sure you want to delete "${party.title || 'Unnamed Party'}"? This action cannot be undone.`,
+                          buttons: [
+                            { label: "Cancel", value: "cancel", variant: "outline" },
+                            { label: "Delete", value: "delete", variant: "destructive" },
+                          ],
+                        });
+                        if (result === "delete") {
+                          if (typeof party.id === 'string') {
+                            handleDeleteParty(party.id);
+                          } else {
+                            toast.error("Cannot delete party: Party ID is missing.");
+                            console.error("Delete failed: party.id is not a string", party);
+                          }
+                        }
                       }}
                     >
                       <Trash2 class="h-4 w-4" />
@@ -218,34 +226,6 @@
           </TableBody>
         </Table>
       </div>
-    {/if}
-
-    {#if showDeleteConfirm && partyToDelete}
-      <AlertDialog.Root bind:open={showDeleteConfirm}>
-        <AlertDialog.Content>
-          <AlertDialog.Header>
-            <AlertDialog.Title>Are you sure?</AlertDialog.Title>
-            <AlertDialog.Description>
-              This action cannot be undone. This will permanently delete the
-              party "<strong>{partyToDelete.title || "Unnamed Party"}</strong>".
-            </AlertDialog.Description>
-          </AlertDialog.Header>
-          <AlertDialog.Footer>
-            <AlertDialog.Cancel
-              onclick={() => {
-                partyToDelete = null;
-                showDeleteConfirm = false;
-              }}>Cancel</AlertDialog.Cancel
-            >
-            <AlertDialog.Action
-              onclick={() => handleDeleteParty(partyToDelete!.id!)}
-              class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialog.Action>
-          </AlertDialog.Footer>
-        </AlertDialog.Content>
-      </AlertDialog.Root>
     {/if}
   {/snippet}
 </PageTemplate>

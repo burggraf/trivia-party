@@ -21,6 +21,7 @@
   import { goto, invalidateAll } from "$app/navigation";
   import { toast } from "svelte-sonner";
   import * as Tabs from "$lib/components/ui/tabs";
+  import { alertManager } from "$lib/services/alertManager.svelte";
 
   const partyRouteId = $derived($page.params.partyId);
   const isNew = $derived(partyRouteId === "new");
@@ -275,14 +276,10 @@
   async function handleDeleteTeam(teamId: string) {
     if (unauthorized) return;
 
-    if (!confirm("Are you sure you want to delete this team?")) {
-      return;
-    }
-
     loadingTeams = true;
     const { error: deleteError } = await deleteTeam(teamId);
     if (deleteError) {
-      toast.error("Failed to delete team", {
+      toast.error("Error deleting team", {
         description: deleteError.message,
       });
     } else {
@@ -506,12 +503,29 @@
                               <Edit class="h-4 w-4" />
                             </Button>
                             <Button
-                              onclick={() => handleDeleteTeam(team.id)}
                               variant="ghost"
                               size="icon"
                               title="Delete Team"
                               class="text-destructive hover:text-destructive-foreground hover:bg-destructive/80"
                               disabled={unauthorized}
+                              onclick={async () => {
+                                const result = await alertManager.show({
+                                  title: "Confirm Delete Team",
+                                  message: `Are you sure you want to delete team "${team.team_name || 'Unnamed Team'}"? This action cannot be undone.`,
+                                  buttons: [
+                                    { label: "Cancel", value: "cancel", variant: "outline" },
+                                    { label: "Delete", value: "delete", variant: "destructive" },
+                                  ],
+                                });
+                                if (result === "delete") {
+                                  if (team.id) {
+                                    await handleDeleteTeam(team.id);
+                                  } else {
+                                    toast.error("Cannot delete team: Team ID is missing.");
+                                    console.error("Delete failed: team.id is missing", team);
+                                  }
+                                }
+                              }}
                             >
                               <Trash2 class="h-4 w-4" />
                             </Button>
