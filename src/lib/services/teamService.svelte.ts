@@ -84,11 +84,31 @@ export const deleteTeam = async (id: string) => {
     if (!currentOrg?.id) {
         return { data: null, error: new Error("No organization selected") };
     }
-    const { data, error } = await supabase.from("teams").delete().eq(
-        "id",
-        id,
-    );
-    return { data, error };
+
+    const { data, error } = await supabase
+        .from("teams")
+        .delete()
+        .eq("id", id)
+        // Also match orgid to ensure user can only delete from their current org
+        // This is a good practice even if RLS handles it, for defense-in-depth
+        .eq("orgid", currentOrg.id) 
+        .select(); // Chain .select() to get back the deleted records if successful
+
+    if (error) {
+        return { data, error };
+    }
+
+    // If no error, but data is null or an empty array, it means RLS likely prevented deletion
+    // or the team didn't exist / didn't match the orgid criteria.
+    if (!data || data.length === 0) {
+        return {
+            data: null,
+            error: new Error("Team not found or delete operation was blocked. Please check permissions or team details."),
+        };
+    }
+
+    // If data is present (and not empty), deletion was successful
+    return { data, error: null }; // Explicitly return error as null on success
 };
 
 export const getTeamById = async (id: string) => {

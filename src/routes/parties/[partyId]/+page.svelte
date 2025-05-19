@@ -115,12 +115,15 @@
   }
 
   async function initializePage() {
+    // Initial broad authorization check based on user role in their current organization
     if (!currentUserIsAdminOrManager && currentOrg) {
-      error = "You are not authorized to manage parties.";
+      error = "You are not authorized to manage parties in this organization.";
       unauthorized = true;
       loading = false;
       return;
     }
+    // Tentatively set authorized for general party management in the org;
+    // will verify for specific party if editing an existing one.
     unauthorized = false;
 
     loading = true;
@@ -136,16 +139,37 @@
       loading = false;
     } else {
       pageTitle = "Edit Party";
-      const { data, error: fetchError } = await getPartyById(partyRouteId);
+      const { data: fetchedPartyData, error: fetchError } =
+        await getPartyById(partyRouteId);
+
       if (fetchError) {
         error = fetchError.message;
         toast.error("Error loading party", { description: error });
-      } else if (data) {
-        party = data;
-        await fetchTeams(); // Fetch teams after party data is loaded
+        unauthorized = true; // Can't load party, assume unauthorized
+      } else if (fetchedPartyData) {
+        party = fetchedPartyData;
+
+        // CRITICAL CHECK: Verify party ownership against current organization
+        if (currentOrg && party.orgid !== currentOrg.id) {
+          error =
+            "Access Denied: This party does not belong to your current organization.";
+          unauthorized = true; // Mark as unauthorized for THIS specific party
+          toast.error("Access Denied", { description: error });
+        } else if (!currentOrg && party.orgid) {
+          // This case implies user has no currentOrg but party has an orgid.
+          // Should ideally be caught by backend.svelte.ts, but as a safeguard:
+          error = "Authorization error: Organization context mismatch.";
+          unauthorized = true;
+          toast.error("Authorization Error", { description: error });
+        } else {
+          // User is authorized for this party (either org matches, or org context isn't strictly enforced for this user, e.g. superadmin)
+          // unauthorized remains false from the earlier check.
+          await fetchTeams(); // Fetch teams only if authorized for this party
+        }
       } else {
         error = "Party not found.";
         toast.error("Error", { description: error });
+        unauthorized = true; // Party not found, assume unauthorized
       }
       loading = false;
     }
@@ -155,7 +179,8 @@
     initializePage();
   });
 
-  async function handleSaveParty() {
+  async function handleSaveParty(event: Event) {
+    event.preventDefault(); // Manual preventDefault for onsubmit
     if (unauthorized) {
       toast.error("Unauthorized", { description: "You cannot save changes." });
       return;
@@ -192,7 +217,8 @@
     }
   }
 
-  async function handleAddTeam() {
+  async function handleAddTeam(event: Event) {
+    event.preventDefault(); // Manual preventDefault for onsubmit
     if (!newTeamName.trim() || !party.id) {
       toast.error("Cannot add team", {
         description: "Team name cannot be empty.",
@@ -216,6 +242,7 @@
   }
 
   function startEditTeam(team: Team) {
+    if (unauthorized) return;
     editingTeamId = team.id;
     editingTeamName = team.team_name || "";
   }
@@ -246,7 +273,12 @@
   }
 
   async function handleDeleteTeam(teamId: string) {
-    if (!confirm("Are you sure you want to delete this team?")) return;
+    if (unauthorized) return;
+
+    if (!confirm("Are you sure you want to delete this team?")) {
+      return;
+    }
+
     loadingTeams = true;
     const { error: deleteError } = await deleteTeam(teamId);
     if (deleteError) {
@@ -291,7 +323,7 @@
       variant="ghost"
       size="icon"
       title="Back to Parties"
-      on:click={() => goto("/parties")}
+      onclick={() => goto("/parties")}
     >
       <ArrowLeft class="h-4 w-4" />
     </Button>
@@ -313,13 +345,7 @@
         <p>{error || "You do not have permission to view this page."}</p>
       </div>
     {:else}
-      <Tabs.Root
-        value={activeTab}
-        on:valueChange={(event: CustomEvent<string | undefined>) => {
-          if (event.detail) activeTab = event.detail;
-        }}
-        class="w-full p-4 md:p-6"
-      >
+      <Tabs.Root bind:value={activeTab} class="w-full p-4 md:p-6">
         <Tabs.List class="grid w-full grid-cols-2">
           <Tabs.Trigger value="details">Details</Tabs.Trigger>
           <Tabs.Trigger value="teams" disabled={isNew}>Teams</Tabs.Trigger>
@@ -327,10 +353,7 @@
 
         <Tabs.Content value="details">
           <div class="w-full flex justify-center pt-6">
-            <form
-              on:submit|preventDefault={handleSaveParty}
-              class="max-w-md w-full space-y-6"
-            >
+            <form onsubmit={handleSaveParty} class="max-w-md w-full space-y-6">
               <div>
                 <Label for="partyName">Party Name</Label>
                 <Input
@@ -420,10 +443,7 @@
               {#if loadingTeams}
                 <p>Loading teams...</p>
               {:else}
-                <form
-                  on:submit|preventDefault={handleAddTeam}
-                  class="flex items-center gap-2"
-                >
+                <form onsubmit={handleAddTeam} class="flex items-center gap-2">
                   <Input
                     type="text"
                     placeholder="New team name"
@@ -442,12 +462,14 @@
                 </form>
 
                 {#if teams.length === 0}
-                  <p class="text-muted-foreground">No teams added yet.</p>
+                  <p class="text-muted-foreground text-center py-4">
+                    No teams added yet.
+                  </p>
                 {:else}
                   <ul class="space-y-2">
                     {#each teams as team (team.id)}
                       <li
-                        class="flex items-center justify-between p-2 border rounded-md"
+                        class="flex items-center justify-between p-3 bg-muted/50 rounded-md"
                       >
                         {#if editingTeamId === team.id}
                           <Input
@@ -455,18 +477,18 @@
                             bind:value={editingTeamName}
                             class="flex-grow mr-2"
                             disabled={loadingTeams || unauthorized}
-                            on:keydown={(e: KeyboardEvent) => {
+                            onkeydown={(e: KeyboardEvent) => {
                               if (e.key === "Enter") handleUpdateTeam();
                             }}
                           />
                           <Button
-                            on:click={handleUpdateTeam}
+                            onclick={handleUpdateTeam}
                             disabled={loadingTeams || unauthorized}
                             variant="outline"
                             size="sm">Save</Button
                           >
                           <Button
-                            on:click={() => (editingTeamId = null)}
+                            onclick={() => (editingTeamId = null)}
                             disabled={loadingTeams || unauthorized}
                             variant="ghost"
                             size="sm">Cancel</Button
@@ -475,7 +497,7 @@
                           <span class="flex-grow">{team.team_name}</span>
                           <div class="flex items-center gap-1">
                             <Button
-                              on:click={() => startEditTeam(team)}
+                              onclick={() => startEditTeam(team)}
                               variant="ghost"
                               size="icon"
                               title="Edit Team Name"
@@ -484,7 +506,7 @@
                               <Edit class="h-4 w-4" />
                             </Button>
                             <Button
-                              on:click={() => handleDeleteTeam(team.id)}
+                              onclick={() => handleDeleteTeam(team.id)}
                               variant="ghost"
                               size="icon"
                               title="Delete Team"
