@@ -9,14 +9,16 @@
   const dispatch = createEventDispatcher<{
     save: Contact;
   }>();
-  
-  const { initialContact = {
-    firstname: "",
-    lastname: "",
-    email: "",
-    phone: "",
-    contact_type: "other",
-  } } = $props<{
+
+  const {
+    initialContact = {
+      firstname: "",
+      lastname: "",
+      email: "",
+      phone: "",
+      contact_type: "other",
+    },
+  } = $props<{
     initialContact?: Partial<Contact>;
   }>();
 
@@ -61,7 +63,7 @@
   }
 </script>
 
-<form class="space-y-6" on:submit={handleSubmit}>
+<form class="space-y-6" onsubmit={handleSubmit}>
   <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
     <div class="space-y-2">
       <Label for="firstname">First Name *</Label>
@@ -107,7 +109,8 @@
     <Label for="contact_type">Contact Type</Label>
     <Select.Root type="single" bind:value={contact.contact_type}>
       <Select.Trigger class="w-full">
-        {contactTypes.find((t) => t.value === contact.contact_type)?.label ?? "Select type..."}
+        {contactTypes.find((t) => t.value === contact.contact_type)?.label ??
+          "Select type..."}
       </Select.Trigger>
       <Select.Content>
         {#each contactTypes as type}

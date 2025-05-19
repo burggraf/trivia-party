@@ -149,7 +149,7 @@
 <div class="space-y-4">
   <div class="flex justify-between items-center">
     <h3 class="text-lg font-medium">Property Contacts</h3>
-    <ContactPicker on:select={handleContactSelect}>
+    <ContactPicker onselect={handleContactSelect}>
       <Button variant="outline" size="sm">
         <Plus class="h-4 w-4 mr-2" />
         Add Contact
