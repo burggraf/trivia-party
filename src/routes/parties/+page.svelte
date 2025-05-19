@@ -169,7 +169,16 @@
           </TableHeader>
           <TableBody>
             {#each filteredParties as party (party.id)}
-              <TableRow>
+              <TableRow
+                class={currentUserIsAdminOrManager
+                  ? "cursor-pointer hover:bg-muted/50"
+                  : ""}
+                onclick={(event: Event) => {
+                  if (currentUserIsAdminOrManager) {
+                    goto(`/parties/${party.id}`);
+                  }
+                }}
+              >
                 <TableCell>
                   <div class="font-medium">
                     {party.title || "Unnamed Party"}
@@ -193,16 +202,9 @@
                     <Button
                       variant="ghost"
                       size="icon"
-                      title="Edit Party"
-                      onclick={() => goto(`/parties/${party.id}`)}
-                    >
-                      <Edit class="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
                       title="Delete Party"
-                      onclick={() => {
+                      onclick={(event: Event) => {
+                        event.stopPropagation(); // Prevent row click from firing
                         partyToDelete = party;
                         showDeleteConfirm = true;
                       }}
