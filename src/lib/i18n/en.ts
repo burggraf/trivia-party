@@ -23,6 +23,7 @@ export default {
       title: "People",
       contacts: "Contacts",
       teams: "Teams",
+      parties: "Parties",
     },
     properties: {
       title: "Properties",

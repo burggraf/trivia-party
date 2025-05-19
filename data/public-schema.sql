@@ -405,6 +405,26 @@ COMMENT ON TABLE "public"."orgs_users" IS 'Users belong to Orgs';
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."parties" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "orgid" "uuid",
+    "title" "text",
+    "starttime" timestamp with time zone,
+    "endtime" timestamp with time zone,
+    "location" "text",
+    "notes" "text",
+    "teamsize" numeric
+);
+
+
+ALTER TABLE "public"."parties" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."parties" IS 'Trivia Party Events';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."profiles" (
     "id" "uuid" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
@@ -513,7 +533,8 @@ CREATE TABLE IF NOT EXISTS "public"."teams" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "orgid" "uuid",
-    "team_name" "text"
+    "team_name" "text",
+    "partyid" "uuid" NOT NULL
 );
 
 
@@ -521,6 +542,10 @@ ALTER TABLE "public"."teams" OWNER TO "postgres";
 
 
 COMMENT ON TABLE "public"."teams" IS 'teams for trivia party events';
+
+
+
+COMMENT ON COLUMN "public"."teams"."partyid" IS 'id from parties table';
 
 
 
@@ -607,6 +632,11 @@ ALTER TABLE ONLY "public"."orgs"
 
 ALTER TABLE ONLY "public"."orgs_users"
     ADD CONSTRAINT "orgs_users_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."parties"
+    ADD CONSTRAINT "parties_pkey" PRIMARY KEY ("id");
 
 
 
@@ -707,6 +737,11 @@ ALTER TABLE ONLY "public"."orgs_users"
 
 
 
+ALTER TABLE ONLY "public"."parties"
+    ADD CONSTRAINT "parties_orgid_fkey" FOREIGN KEY ("orgid") REFERENCES "public"."orgs"("id") ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."profiles"
     ADD CONSTRAINT "profile_id_fkey" FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
 
@@ -729,6 +764,11 @@ ALTER TABLE ONLY "public"."properties_contacts"
 
 ALTER TABLE ONLY "public"."teams"
     ADD CONSTRAINT "teams_orgid_fkey" FOREIGN KEY ("orgid") REFERENCES "public"."orgs"("id") ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."teams"
+    ADD CONSTRAINT "teams_partyid_fkey" FOREIGN KEY ("partyid") REFERENCES "public"."parties"("id") ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 
@@ -816,6 +856,26 @@ CREATE POLICY "admin or invitee can view invite" ON "public"."orgs_invites" FOR 
 
 
 
+CREATE POLICY "admin, manager can delete parteis" ON "public"."parties" FOR DELETE USING ((( SELECT "orgs_users"."user_role"
+   FROM "public"."orgs_users"
+  WHERE (("orgs_users"."orgid" = "parties"."orgid") AND ("orgs_users"."userid" = ( SELECT "auth"."uid"() AS "uid")))) = ANY (ARRAY['Admin'::"text", 'Manager'::"text"])));
+
+
+
+CREATE POLICY "admin, manager can insert parties" ON "public"."parties" FOR INSERT WITH CHECK ((( SELECT "orgs_users"."user_role"
+   FROM "public"."orgs_users"
+  WHERE (("orgs_users"."orgid" = "parties"."orgid") AND ("orgs_users"."userid" = ( SELECT "auth"."uid"() AS "uid")))) = ANY (ARRAY['Admin'::"text", 'Manager'::"text"])));
+
+
+
+CREATE POLICY "admin, manager can update parties" ON "public"."parties" FOR UPDATE USING ((( SELECT "orgs_users"."user_role"
+   FROM "public"."orgs_users"
+  WHERE (("orgs_users"."orgid" = "parties"."orgid") AND ("orgs_users"."userid" = ( SELECT "auth"."uid"() AS "uid")))) = ANY (ARRAY['Admin'::"text", 'Manager'::"text"]))) WITH CHECK ((( SELECT "orgs_users"."user_role"
+   FROM "public"."orgs_users"
+  WHERE (("orgs_users"."orgid" = "parties"."orgid") AND ("orgs_users"."userid" = ( SELECT "auth"."uid"() AS "uid")))) = ANY (ARRAY['Admin'::"text", 'Manager'::"text"])));
+
+
+
 CREATE POLICY "all org users can view teams" ON "public"."teams" FOR SELECT USING ((( SELECT "auth"."uid"() AS "uid") IN ( SELECT "orgs_users"."orgid"
    FROM "public"."orgs_users"
   WHERE ("orgs_users"."orgid" = "teams"."orgid"))));
@@ -879,6 +939,12 @@ CREATE POLICY "org role must be Admin or Manager" ON "public"."properties" FOR U
 
 
 
+CREATE POLICY "org users can view all parties" ON "public"."parties" FOR SELECT USING ((( SELECT "orgs_users"."user_role"
+   FROM "public"."orgs_users"
+  WHERE (("orgs_users"."orgid" = "parties"."orgid") AND ("orgs_users"."userid" = ( SELECT "auth"."uid"() AS "uid")))) = ANY (ARRAY['Admin'::"text", 'Manager'::"text"])));
+
+
+
 ALTER TABLE "public"."orgs" ENABLE ROW LEVEL SECURITY;
 
 
@@ -886,6 +952,9 @@ ALTER TABLE "public"."orgs_invites" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."orgs_users" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."parties" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY;
@@ -1077,6 +1146,12 @@ GRANT ALL ON TABLE "public"."orgs_invites" TO "service_role";
 GRANT ALL ON TABLE "public"."orgs_users" TO "anon";
 GRANT ALL ON TABLE "public"."orgs_users" TO "authenticated";
 GRANT ALL ON TABLE "public"."orgs_users" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."parties" TO "anon";
+GRANT ALL ON TABLE "public"."parties" TO "authenticated";
+GRANT ALL ON TABLE "public"."parties" TO "service_role";
 
 
 

@@ -16,6 +16,7 @@ export default {
       title: "Personas",
       contacts: "Contactos",
       teams: "Equipos",
+      parties: "Fiestas",
     },
     properties: {
       title: "Propiedades",

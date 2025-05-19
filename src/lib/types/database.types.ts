@@ -264,6 +264,50 @@ export type Database = {
           },
         ]
       }
+      parties: {
+        Row: {
+          created_at: string
+          endtime: string | null
+          id: string
+          location: string | null
+          notes: string | null
+          orgid: string | null
+          starttime: string | null
+          teamsize: number | null
+          title: string | null
+        }
+        Insert: {
+          created_at?: string
+          endtime?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          orgid?: string | null
+          starttime?: string | null
+          teamsize?: number | null
+          title?: string | null
+        }
+        Update: {
+          created_at?: string
+          endtime?: string | null
+          id?: string
+          location?: string | null
+          notes?: string | null
+          orgid?: string | null
+          starttime?: string | null
+          teamsize?: number | null
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parties_orgid_fkey"
+            columns: ["orgid"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           bio: string | null
@@ -482,23 +526,23 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          metadata: Json | null
-          team_name: string
-          orgid: string
+          orgid: string | null
+          partyid: string
+          team_name: string | null
         }
         Insert: {
           created_at?: string
           id?: string
-          metadata?: Json | null
-          team_name: string
-          orgid: string
+          orgid?: string | null
+          partyid: string
+          team_name?: string | null
         }
         Update: {
           created_at?: string
           id?: string
-          metadata?: Json | null
-          team_name?: string
-          orgid?: string
+          orgid?: string | null
+          partyid?: string
+          team_name?: string | null
         }
         Relationships: [
           {
@@ -507,7 +551,14 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "orgs"
             referencedColumns: ["id"]
-          }
+          },
+          {
+            foreignKeyName: "teams_partyid_fkey"
+            columns: ["partyid"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id"]
+          },
         ]
       }
       transactions: {
