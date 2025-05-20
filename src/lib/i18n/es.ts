@@ -29,6 +29,7 @@ export default {
       about: "Acerca de esta aplicación",
       terms: "Términos de Servicio",
       privacy: "Política de Privacidad",
+      dataDeletion: "Política de Eliminación de Datos",
     },
     samples: {
       title: "Ejemplos",

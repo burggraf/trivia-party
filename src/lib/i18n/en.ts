@@ -36,6 +36,7 @@ export default {
       about: "About this app",
       terms: "Terms of Service",
       privacy: "Privacy Policy",
+      dataDeletion: "Data Deletion Policy",
     },
     samples: {
       title: "Samples",

@@ -102,6 +102,10 @@
           title: $t("menu.information.privacy"),
           url: "/privacy",
         },
+        {
+          title: $t("menu.information.dataDeletion"),
+          url: "/data-deletion",
+        },
       ],
     },
     {
