@@ -1,3 +1,3 @@
 #!/bin/bash
 npm run build && \
-wrangler pages deploy build --branch production
+wrangler pages deployment create build --project-name trivia-party
