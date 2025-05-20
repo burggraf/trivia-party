@@ -240,11 +240,11 @@ export const signUp = async (
   return String(signUpError);
 };
 
-export const signInWithOAuth = async (provider: string) => {
+export const signInWithOAuth = async (provider: 'google' | 'facebook') => {
   let currentUrl = window.location.href;
   localStorage.setItem("redirectUrl", currentUrl);
   const { error: signInError } = await supabase.auth.signInWithOAuth({
-    provider: "google",
+    provider,
     options: {
       redirectTo: `${window.location.origin + "/auth/redirect"}`, //currentUrl ? currentUrl :`${window.location.origin}/`
     },

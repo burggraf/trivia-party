@@ -114,6 +114,33 @@
     }
   }
 
+  async function handleFacebookLogin() {
+    if (!browser) return;
+
+    loading = true;
+    error = null;
+
+    try {
+      const signInError = await signInWithOAuth("facebook");
+      if (signInError) {
+        error = signInError.message;
+        toast.error("ERROR", {
+          description: error,
+        });
+      } else {
+        closeModal();
+      }
+    } catch (e) {
+      error = "An unexpected error occurred";
+      console.error(e);
+      toast.error("ERROR", {
+        description: error,
+      });
+    } finally {
+      loading = false;
+    }
+  }
+
   function toggleMode() {
     isLogin = !isLogin;
     error = null;
@@ -236,6 +263,29 @@
             />
           </svg>
           Google
+        </Button>
+        <Button
+          class="w-full"
+          variant="outline"
+          onclick={handleFacebookLogin}
+          disabled={loading}
+        >
+          <svg
+            class="mr-2 h-4 w-4"
+            aria-hidden="true"
+            focusable="false"
+            data-prefix="fab"
+            data-icon="facebook"
+            role="img"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 320 512"
+          >
+            <path
+              fill="currentColor"
+              d="M279.14 288l14.22-92.66h-88.91v-60.13c0-25.35 12.42-50.06 52.24-50.06h40.42V6.26S260.43 0 225.36 0c-73.22 0-121.08 44.38-121.08 124.72v70.62H22.89V288h81.39v224h100.17V288z"
+            />
+          </svg>
+          Facebook
         </Button>
       </form>
       <Dialog.Footer>
