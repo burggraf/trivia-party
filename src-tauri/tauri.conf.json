@@ -3,6 +3,9 @@
   "productName": "trivia-party",
   "version": "0.0.1",
   "identifier": "com.azabab.triviaparty",
+  "ios": {
+    "developmentTeam": "HEGN9W2S9J"
+  },
   "build": {
     "frontendDist": "../build",
     "devUrl": "http://localhost:5174",
@@ -24,6 +27,7 @@
     }
   },
   "bundle": {
+    "identifier": "com.azabab.triviaparty",
     "active": true,
     "targets": "all",
     "icon": [

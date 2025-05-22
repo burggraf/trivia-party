@@ -103,7 +103,7 @@ jobs:
       - name: Build Tauri iOS app
         # Ensure your tauri.conf.json has the correct bundle identifier and Apple Team ID
         # Use --verbose for more detailed output if troubleshooting
-        run: npx tauri ios build --profile release # Specify release profile
+        run: tauri ios build --profile release
         env:
           TAURI_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }} # Explicitly pass if needed
 
