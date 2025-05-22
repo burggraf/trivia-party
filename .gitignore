@@ -32,3 +32,4 @@ static/apple-touch-icon.png
 # Capacitor
 capacitor.config.ts
 
+set_github_ios_secrets.sh

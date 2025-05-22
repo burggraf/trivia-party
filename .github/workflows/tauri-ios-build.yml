@@ -93,10 +93,12 @@ jobs:
       - name: Initialize Tauri mobile projects (if not already committed)
         run: |
           if [ ! -d "src-tauri/gen/apple" ]; then
+            echo "iOS project not found in src-tauri/gen/apple. Initializing..."
             npx tauri ios init
           else
             echo "iOS project already initialized."
-        continue-on-error: true # In case init fails due to config, build step will show clearer error
+          fi
+        continue-on-error: true # It's good to keep this, init might fail for other reasons
 
       - name: Build Tauri iOS app
         # Ensure your tauri.conf.json has the correct bundle identifier and Apple Team ID
