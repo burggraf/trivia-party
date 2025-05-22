@@ -103,8 +103,9 @@ jobs:
       - name: Build Tauri iOS app
         # Ensure your tauri.conf.json has the correct bundle identifier and Apple Team ID
         # Use --verbose for more detailed output if troubleshooting
-        run: tauri ios build --profile release
+        run: tauri ios build
         env:
+          TAURI_ENV: production
           TAURI_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }} # Explicitly pass if needed
 
       - name: Upload iOS App Artifact
