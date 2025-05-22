@@ -1,0 +1,1 @@
+tauri ios dev --open

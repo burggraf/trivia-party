@@ -1,0 +1,123 @@
+name: Tauri iOS Build
+
+on:
+  workflow_dispatch: # Allows manual triggering
+  push:
+    branches:
+      - main # Or your preferred branch, e.g., 'release-ios'
+
+jobs:
+  build-ios:
+    runs-on: macos-latest # iOS builds require macOS
+    env:
+      # Supabase secrets (if needed during build)
+      SUPABASE_URL_ENCRYPTED: ${{ secrets.SUPABASE_URL_ENCRYPTED }}
+      SUPABASE_URL_ENCRYPTION_KEY: ${{ secrets.SUPABASE_URL_ENCRYPTION_KEY }}
+      SUPABASE_ANON_KEY_ENCRYPTED: ${{ secrets.SUPABASE_ANON_KEY_ENCRYPTED }}
+      SUPABASE_ANON_KEY_ENCRYPTION_KEY: ${{ secrets.SUPABASE_ANON_KEY_ENCRYPTION_KEY }}
+
+      # Secrets for iOS signing
+      IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+      IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+      IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }} # Ensure this is set in tauri.conf.json or as a secret
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install Rust toolchain and iOS targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,armv7-apple-ios,x86_64-apple-ios # Add simulator targets if needed, e.g., aarch64-apple-ios-sim
+
+      - name: Install Xcode Command Line Tools
+        run: |
+          echo "Attempting to install Xcode Command Line Tools..."
+          sudo xcode-select --install || echo "Xcode Command Line Tools already installed or an error occurred. Continuing..."
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-path
+
+      - name: Setup iOS Signing
+        if: env.IOS_CERTIFICATE_BASE64 != '' && env.IOS_PROVISIONING_PROFILE_BASE64 != ''
+        run: |
+          echo "Setting up iOS signing..."
+          KEYCHAIN_NAME="build.keychain"
+          KEYCHAIN_PASSWORD="temporary_password_for_keychain" # This is a temporary password for the keychain itself
+
+          # Create a new temporary keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+          security list-keychains -s "$KEYCHAIN_NAME" # Add to search list
+          security default-keychain -s "$KEYCHAIN_NAME" # Set as default
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_NAME" # Unlock for 6 hours
+
+          # Import the certificate
+          echo "${{ secrets.IOS_CERTIFICATE_BASE64 }}" | base64 --decode > certificate.p12
+          security import certificate.p12 -k "$KEYCHAIN_NAME" -P "${{ secrets.IOS_CERTIFICATE_PASSWORD }}" -A # -A allows any app to access the key
+          rm certificate.p12
+          
+          # Allow codesign to access the imported certificate
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
+
+          # Install provisioning profile
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > profile.mobileprovision
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' /dev/stdin <<< "$(security cms -D -i profile.mobileprovision)")
+          cp profile.mobileprovision "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+          rm profile.mobileprovision
+          echo "iOS signing setup complete."
+        # Continue even if secrets are missing, build might fail later but allows testing other steps
+        continue-on-error: true 
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Tauri CLI (globally for this runner or locally)
+        run: pnpm add -g @tauri-apps/cli || pnpm add -D @tauri-apps/cli
+
+      - name: Build SvelteKit frontend
+        run: pnpm build
+        env: # Pass Supabase keys if your SvelteKit build needs them
+          VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL_ENCRYPTED }} # Adjust if you decrypt them differently for VITE_
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_ENCRYPTED }} # Adjust accordingly
+
+      - name: Initialize Tauri mobile projects (if not already committed)
+        run: |
+          if [ ! -d "src-tauri/gen/apple" ]; then
+            pnpm tauri ios init
+          else
+            echo "iOS project already initialized."
+          fi
+        continue-on-error: true # In case init fails due to config, build step will show clearer error
+
+      - name: Build Tauri iOS app
+        # Ensure your tauri.conf.json has the correct bundle identifier and Apple Team ID
+        # Use --verbose for more detailed output if troubleshooting
+        run: pnpm tauri ios build --profile release # Specify release profile
+        env:
+          TAURI_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }} # Explicitly pass if needed
+
+      - name: Upload iOS App Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TriviaParty-iOS-App
+          # Path to the .ipa file. This might vary based on your app name and exact Tauri output.
+          # Common path: src-tauri/gen/apple/DerivedData/App/Build/Products/Release-iphoneos/[YourAppName].ipa
+          # Or from target: src-tauri/target/[target-triple]/release/bundle/ios/[YourAppName].ipa
+          # Using a wildcard to find the .ipa in common locations:
+          path: |
+            src-tauri/target/**/release/bundle/ios/*.ipa
+            src-tauri/gen/apple/**/Release-iphoneos/*.ipa
+          if-no-files-found: error # Fail the workflow if no IPA is found
