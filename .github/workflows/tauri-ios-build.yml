@@ -26,16 +26,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 8
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'pnpm'
+          cache: 'npm'
 
       - name: Install Rust toolchain and iOS targets
         uses: dtolnay/rust-toolchain@stable
@@ -82,13 +77,15 @@ jobs:
         continue-on-error: true 
 
       - name: Install frontend dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm install
 
-      - name: Install Tauri CLI (globally for this runner or locally)
-        run: pnpm add -g @tauri-apps/cli || pnpm add -D @tauri-apps/cli
+      - name: Install Tauri CLI
+        # If @tauri-apps/cli is in your devDependencies (package.json), this step might not be needed
+        # as npx will use the local version. Or install globally:
+        run: npm install -g @tauri-apps/cli # Or npm install -D @tauri-apps/cli if you prefer local
 
       - name: Build SvelteKit frontend
-        run: pnpm build
+        run: npm run build
         env: # Pass Supabase keys if your SvelteKit build needs them
           VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL_ENCRYPTED }} # Adjust if you decrypt them differently for VITE_
           VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_ENCRYPTED }} # Adjust accordingly
@@ -96,16 +93,15 @@ jobs:
       - name: Initialize Tauri mobile projects (if not already committed)
         run: |
           if [ ! -d "src-tauri/gen/apple" ]; then
-            pnpm tauri ios init
+            npx tauri ios init
           else
             echo "iOS project already initialized."
-          fi
         continue-on-error: true # In case init fails due to config, build step will show clearer error
 
       - name: Build Tauri iOS app
         # Ensure your tauri.conf.json has the correct bundle identifier and Apple Team ID
         # Use --verbose for more detailed output if troubleshooting
-        run: pnpm tauri ios build --profile release # Specify release profile
+        run: npx tauri ios build --profile release # Specify release profile
         env:
           TAURI_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }} # Explicitly pass if needed
 
