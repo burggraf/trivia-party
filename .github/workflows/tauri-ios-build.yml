@@ -3,8 +3,8 @@ name: Tauri iOS Build
 on:
   workflow_dispatch: # Allows manual triggering
   push:
-    branches:
-      - main # Or your preferred branch, e.g., 'release-ios'
+    branches: 
+      - release-ios # Or your preferred branch, e.g., 'release-ios'
 
 jobs:
   build-ios:
