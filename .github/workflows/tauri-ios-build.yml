@@ -35,7 +35,7 @@ jobs:
       - name: Install Rust toolchain and iOS targets
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-ios,armv7-apple-ios,x86_64-apple-ios # Add simulator targets if needed, e.g., aarch64-apple-ios-sim
+          targets: aarch64-apple-ios,x86_64-apple-ios # Add simulator targets if needed, e.g., aarch64-apple-ios-sim
 
       - name: Install Xcode Command Line Tools
         run: |
