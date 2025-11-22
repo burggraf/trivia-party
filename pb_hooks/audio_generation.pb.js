@@ -180,11 +180,13 @@ onBootstrap((e) => {
 
     // Process pending jobs - inline implementation
     if (isProcessing) {
+      console.log('[AudioGen] Worker already processing, skipping this interval');
       return; // Already processing, skip this interval
     }
 
     try {
       isProcessing = true;
+      console.log('[AudioGen] Worker checking for pending jobs...');
 
       // Find oldest pending job
       const pendingJobs = $app.findRecordsByFilter(
@@ -194,6 +196,8 @@ onBootstrap((e) => {
         1,
         0
       );
+
+      console.log(`[AudioGen] Found ${pendingJobs.length} pending job(s)`);
 
       if (pendingJobs.length === 0) {
         return; // No pending jobs
@@ -211,11 +215,13 @@ onBootstrap((e) => {
 
       // Get API keys
       const apiKeys = getGeminiApiKeys();
+      console.log(`[AudioGen] Retrieved ${apiKeys.length} API key(s)`);
       if (apiKeys.length === 0) {
         throw new Error("No Gemini API keys available");
       }
 
       let currentKeyIndex = job.getInt("current_api_key_index");
+      console.log(`[AudioGen] Current API key index: ${currentKeyIndex}`);
       const failedQuestions = [];
 
       // Get all game_questions for this game
@@ -228,47 +234,63 @@ onBootstrap((e) => {
         { gameId }
       );
 
+      console.log(`[AudioGen] Found ${gameQuestions.length} game question(s) for game ${gameId}`);
+
       let processedCount = job.getInt("processed_questions");
+      console.log(`[AudioGen] Starting from processed count: ${processedCount}`);
 
       // Process each question
       for (let i = 0; i < gameQuestions.length; i++) {
         const gameQuestion = gameQuestions[i];
+        console.log(`[AudioGen] Processing question ${i + 1}/${gameQuestions.length} (ID: ${gameQuestion.id})`);
 
         // Skip if already has audio
-        if (gameQuestion.getString("audio_status") === "available") {
+        const audioStatus = gameQuestion.getString("audio_status");
+        console.log(`[AudioGen] Question ${gameQuestion.id} audio status: ${audioStatus}`);
+        if (audioStatus === "available") {
+          console.log(`[AudioGen] Skipping question ${gameQuestion.id} - audio already available`);
           processedCount++;
           continue;
         }
 
         try {
           // Update status to generating
+          console.log(`[AudioGen] Setting question ${gameQuestion.id} status to 'generating'`);
           const gqForm = new RecordUpsertForm($app, gameQuestion);
           gqForm.load({ audio_status: "generating" });
           gqForm.submit();
 
           // Get question text
           const questionId = gameQuestion.getString("question");
+          console.log(`[AudioGen] Fetching question text for question ID: ${questionId}`);
           const question = $app.findRecordById("questions", questionId);
           const questionText = question.getString("text");
+          console.log(`[AudioGen] Question text (first 50 chars): ${questionText.substring(0, 50)}...`);
 
           // Try to generate audio with retry logic
           let audioContent = null;
           let attempts = 0;
           let lastError = null;
 
+          console.log(`[AudioGen] Starting audio generation attempts for question ${gameQuestion.id}`);
           while (attempts < 3 && audioContent === null) {
             try {
               const apiKey = apiKeys[currentKeyIndex % apiKeys.length];
+              console.log(`[AudioGen] Attempt ${attempts + 1}/3 using API key index ${currentKeyIndex % apiKeys.length}`);
               audioContent = await generateAudio(questionText, apiKey);
+              console.log(`[AudioGen] Successfully generated audio (${audioContent.length} bytes)`);
             } catch (err) {
               lastError = err;
               attempts++;
+              console.error(`[AudioGen] Attempt ${attempts} failed:`, err.message);
 
               // If rate limit, rotate immediately
               if (err.message.includes("429")) {
+                console.log(`[AudioGen] Rate limit detected, rotating API key`);
                 currentKeyIndex++;
               } else {
                 // For other errors, try next key
+                console.log(`[AudioGen] Error detected, trying next API key`);
                 currentKeyIndex++;
               }
 
@@ -276,10 +298,12 @@ onBootstrap((e) => {
               const updateForm = new RecordUpsertForm($app, job);
               updateForm.load({ current_api_key_index: currentKeyIndex });
               updateForm.submit();
+              console.log(`[AudioGen] Updated job API key index to ${currentKeyIndex}`);
             }
           }
 
           if (audioContent) {
+            console.log(`[AudioGen] Decoding and saving audio file for question ${gameQuestion.id}`);
             // Decode base64 and save as file
             const audioBytes = atob(audioContent);
             const audioArray = new Uint8Array(audioBytes.length);
@@ -287,6 +311,7 @@ onBootstrap((e) => {
               audioArray[i] = audioBytes.charCodeAt(i);
             }
             const filename = `${gameQuestion.id}.mp3`;
+            console.log(`[AudioGen] Decoded audio file: ${filename} (${audioArray.length} bytes)`);
 
             // Create form with file
             const fileForm = new RecordUpsertForm($app, gameQuestion);
@@ -296,10 +321,11 @@ onBootstrap((e) => {
             fileForm.loadFormData(fileData);
             fileForm.submit();
 
-            console.log(`[AudioGen] Generated audio for question ${gameQuestion.id}`);
+            console.log(`[AudioGen] Successfully saved audio for question ${gameQuestion.id}`);
           } else {
             // Failed after all retries
             const errorMsg = lastError?.message || "Unknown error";
+            console.error(`[AudioGen] Failed to generate audio after 3 attempts for question ${gameQuestion.id}:`, errorMsg);
             const gqErrorForm = new RecordUpsertForm($app, gameQuestion);
             gqErrorForm.load({
               audio_status: "failed",
@@ -312,25 +338,30 @@ onBootstrap((e) => {
               error_message: errorMsg
             });
 
-            console.error(`[AudioGen] Failed to generate audio for question ${gameQuestion.id}:`, errorMsg);
+            console.error(`[AudioGen] Marked question ${gameQuestion.id} as failed`);
           }
 
           processedCount++;
 
           // Update job progress
+          const currentProgress = Math.floor((processedCount / gameQuestions.length) * 100);
+          console.log(`[AudioGen] Updating job progress: ${processedCount}/${gameQuestions.length} (${currentProgress}%)`);
           const progressForm = new RecordUpsertForm($app, job);
           progressForm.load({
             processed_questions: processedCount,
-            progress: Math.floor((processedCount / gameQuestions.length) * 100),
+            progress: currentProgress,
             failed_questions: failedQuestions
           });
           progressForm.submit();
+          console.log(`[AudioGen] Job progress updated successfully`);
 
           // Rate limit safety: wait 200ms between questions
+          console.log(`[AudioGen] Waiting 200ms before next question...`);
           await new Promise(resolve => setTimeout(resolve, 200));
 
         } catch (err) {
           console.error(`[AudioGen] Unexpected error processing question ${gameQuestion.id}:`, err);
+          console.error(`[AudioGen] Error stack:`, err.stack);
 
           // Mark as failed and continue
           const gqErrorForm = new RecordUpsertForm($app, gameQuestion);
@@ -354,11 +385,13 @@ onBootstrap((e) => {
             failed_questions: failedQuestions
           });
           progressForm.submit();
+          console.log(`[AudioGen] Marked question ${gameQuestion.id} as failed and updated progress`);
         }
       }
 
       // Mark job as complete or failed
       const finalStatus = failedQuestions.length > 0 ? "failed" : "completed";
+      console.log(`[AudioGen] Marking job ${job.id} as ${finalStatus}`);
       const finalForm = new RecordUpsertForm($app, job);
       finalForm.load({ status: finalStatus });
       finalForm.submit();
@@ -367,7 +400,9 @@ onBootstrap((e) => {
 
     } catch (err) {
       console.error('[AudioGen] Worker error:', err);
+      console.error('[AudioGen] Worker error stack:', err.stack);
     } finally {
+      console.log('[AudioGen] Worker finished processing, setting isProcessing = false');
       isProcessing = false;
     }
   });
