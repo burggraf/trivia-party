@@ -355,10 +355,6 @@ onBootstrap((e) => {
           progressForm.submit();
           console.log(`[AudioGen] Job progress updated successfully`);
 
-          // Rate limit safety: wait 200ms between questions
-          console.log(`[AudioGen] Waiting 200ms before next question...`);
-          await new Promise(resolve => setTimeout(resolve, 200));
-
         } catch (err) {
           console.error(`[AudioGen] Unexpected error processing question ${gameQuestion.id}:`, err);
           console.error(`[AudioGen] Error stack:`, err.stack);
