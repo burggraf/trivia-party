@@ -125,18 +125,15 @@ routerAdd("POST", "/api/games/{id}/generate-audio", (e) => {
     const jobsCollection = e.app.findCollectionByNameOrId("audio_generation_jobs");
     const jobRecord = new Record(jobsCollection);
 
-    jobRecord.load({
-      game: gameId,
-      status: "pending",
-      progress: 0,
-      total_questions: totalQuestions,
-      processed_questions: 0,
-      failed_questions: [],
-      current_api_key_index: 0
-    });
+    jobRecord.set("game", gameId);
+    jobRecord.set("status", "pending");
+    jobRecord.set("progress", 0);
+    jobRecord.set("total_questions", totalQuestions);
+    jobRecord.set("processed_questions", 0);
+    jobRecord.set("failed_questions", []);
+    jobRecord.set("current_api_key_index", 0);
 
-    const jobForm = new RecordUpsertForm(e.app, jobRecord);
-    jobForm.submit();
+    e.app.save(jobRecord);
 
     return e.json(202, {
       job_id: jobRecord.id,

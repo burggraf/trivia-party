@@ -56,7 +56,7 @@ migrate((app) => {
         "min": 0,
         "name": "progress",
         "presentable": false,
-        "required": true,
+        "required": false,
         "system": false,
         "type": "number"
       },
@@ -66,7 +66,7 @@ migrate((app) => {
         "min": 0,
         "name": "total_questions",
         "presentable": false,
-        "required": true,
+        "required": false,
         "system": false,
         "type": "number"
       },
@@ -76,7 +76,7 @@ migrate((app) => {
         "min": 0,
         "name": "processed_questions",
         "presentable": false,
-        "required": true,
+        "required": false,
         "system": false,
         "type": "number"
       },
@@ -96,7 +96,7 @@ migrate((app) => {
         "min": 0,
         "name": "current_api_key_index",
         "presentable": false,
-        "required": true,
+        "required": false,
         "system": false,
         "type": "number"
       },
