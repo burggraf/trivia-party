@@ -47,7 +47,8 @@ export default function AudioGenerationModal({ jobId, isOpen, onClose, onRetry }
     return () => {
       unsubscribe.then((unsub: any) => unsub());
     };
-  }, [jobId, isOpen, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId, isOpen]);
 
   if (!job) {
     return (
