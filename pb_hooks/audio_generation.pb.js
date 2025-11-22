@@ -1,63 +1,5 @@
 /// <reference path="../pb_data/types.d.ts" />
 
-// Track worker state
-let isProcessing = false;
-
-// Helper: Get Gemini API keys from environment
-function getGeminiApiKeys() {
-  const keysJson = __env.get('GEMINI_API_KEYS') || '[]';
-  try {
-    const keys = JSON.parse(keysJson);
-    if (!Array.isArray(keys) || keys.length === 0) {
-      console.error('[AudioGen] No Gemini API keys configured');
-      return [];
-    }
-    return keys;
-  } catch (e) {
-    console.error('[AudioGen] Failed to parse GEMINI_API_KEYS:', e);
-    return [];
-  }
-}
-
-// Helper: Call Gemini TTS API with 30-second timeout
-async function generateAudio(text, apiKey) {
-  const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
-
-  // Create timeout promise
-  const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('API request timeout after 30 seconds')), 30000);
-  });
-
-  // Create fetch promise
-  const fetchPromise = fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      input: { text: text },
-      voice: {
-        languageCode: 'en-US',
-        name: 'en-US-Neural2-C'
-      },
-      audioConfig: {
-        audioEncoding: 'MP3'
-      }
-    })
-  });
-
-  // Race between fetch and timeout
-  const response = await Promise.race([fetchPromise, timeoutPromise]);
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Gemini API error ${response.status}: ${error}`);
-  }
-
-  const data = await response.json();
-  return data.audioContent; // base64 encoded MP3
-}
-
 // API endpoint: POST /api/games/:id/generate-audio
 routerAdd("POST", "/api/games/{id}/generate-audio", (e) => {
   const gameId = e.request.pathValue("id");
@@ -156,6 +98,86 @@ onBootstrap((e) => {
   // For sub-minute scheduling, would need to implement in Go
   // See: https://pocketbase.io/docs/js-overview/ and https://github.com/pocketbase/pocketbase/discussions/3535
   cronAdd("audioGenerationWorker", "* * * * *", async () => {
+    console.log('[AudioGen] ===== CRON CALLBACK STARTED =====');
+    console.log('[AudioGen] About to check stuck jobs');
+
+    // Helper: Get Google Cloud API key from settings (accessing at runtime when cron executes)
+    function getGoogleCloudApiKey() {
+      // Access directly from process environment using $app
+      const apiKey = $app.settings().meta.google_cloud_api_key || process.env.GOOGLE_CLOUD_API_KEY;
+      if (!apiKey) {
+        console.error('[AudioGen] No Google Cloud API key configured in settings or environment');
+        return null;
+      }
+
+      console.log('[AudioGen] Loaded Google Cloud API key');
+      return apiKey;
+    }
+
+    // Helper: Decode base64 string to byte array (server-side compatible)
+    function base64ToBytes(base64) {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+      // Remove padding and whitespace
+      base64 = base64.replace(/[^A-Za-z0-9+/]/g, '');
+
+      const bytes = [];
+      let i = 0;
+      while (i < base64.length) {
+        const enc1 = chars.indexOf(base64[i++]);
+        const enc2 = chars.indexOf(base64[i++]);
+        const enc3 = chars.indexOf(base64[i++]);
+        const enc4 = chars.indexOf(base64[i++]);
+
+        const chr1 = (enc1 << 2) | (enc2 >> 4);
+        const chr2 = ((enc2 & 15) << 4) | (enc3 >> 2);
+        const chr3 = ((enc3 & 3) << 6) | enc4;
+
+        bytes.push(chr1);
+        if (enc3 !== -1) bytes.push(chr2);
+        if (enc4 !== -1) bytes.push(chr3);
+      }
+
+      return new Uint8Array(bytes);
+    }
+
+
+    // Helper: Call Google Cloud TTS API using PocketBase HTTP client
+    async function generateAudio(text, apiKey) {
+      const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
+
+      // Use PocketBase's $http.send() with Google Cloud TTS API
+      const response = $http.send({
+        url: url,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          input: { text: text },
+          voice: {
+            languageCode: 'en-US',
+            name: 'en-US-Standard-A'  // Standard voice (lower cost)
+          },
+          audioConfig: {
+            audioEncoding: 'MP3'
+          }
+        })
+      });
+
+      if (response.statusCode !== 200) {
+        throw new Error(`Google Cloud TTS API error ${response.statusCode}: ${response.raw}`);
+      }
+
+      const data = JSON.parse(response.raw);
+
+      // Extract audio from Google Cloud TTS response format
+      if (data.audioContent) {
+        return data.audioContent; // base64 encoded MP3
+      }
+      throw new Error('No audio data in Google Cloud TTS response');
+    }
+
     // Try to reset any stuck jobs (will be empty most of the time)
     try {
       const stuckJobs = $app.findRecordsByFilter(
@@ -169,23 +191,26 @@ onBootstrap((e) => {
       if (stuckJobs && stuckJobs.length > 0) {
         for (const job of stuckJobs) {
           const form = new RecordUpsertForm($app, job);
-          form.load({ status: "pending" });
+          form.load({
+            status: "pending",
+            progress: 0,
+            processed_questions: 0
+          });
           form.submit();
-          console.log(`[AudioGen] Reset stuck job ${job.id} to pending`);
+          console.log(`[AudioGen] Reset stuck job ${job.id} to pending with cleared progress`);
         }
       }
     } catch (err) {
       // Silently ignore stuck job recovery errors
+      console.log('[AudioGen] Stuck job recovery error (ignored)');
     }
+
+    console.log('[AudioGen] Stuck job recovery complete');
 
     // Process pending jobs - inline implementation
-    if (isProcessing) {
-      console.log('[AudioGen] Worker already processing, skipping this interval');
-      return; // Already processing, skip this interval
-    }
+    console.log('[AudioGen] Starting pending job processing...');
 
     try {
-      isProcessing = true;
       console.log('[AudioGen] Worker checking for pending jobs...');
 
       // Find oldest pending job
@@ -213,22 +238,19 @@ onBootstrap((e) => {
       jobForm.load({ status: "processing" });
       jobForm.submit();
 
-      // Get API keys
-      const apiKeys = getGeminiApiKeys();
-      console.log(`[AudioGen] Retrieved ${apiKeys.length} API key(s)`);
-      if (apiKeys.length === 0) {
-        throw new Error("No Gemini API keys available");
+      // Get API key (loaded dynamically when job runs)
+      const apiKey = getGoogleCloudApiKey();
+      if (!apiKey) {
+        throw new Error("No Google Cloud API key available");
       }
 
-      let currentKeyIndex = job.getInt("current_api_key_index");
-      console.log(`[AudioGen] Current API key index: ${currentKeyIndex}`);
       const failedQuestions = [];
 
       // Get all game_questions for this game
       const gameQuestions = $app.findRecordsByFilter(
         "game_questions",
         `game = {:gameId}`,
-        "round_order,order",
+        "sequence",
         -1,
         0,
         { gameId }
@@ -264,7 +286,7 @@ onBootstrap((e) => {
           const questionId = gameQuestion.getString("question");
           console.log(`[AudioGen] Fetching question text for question ID: ${questionId}`);
           const question = $app.findRecordById("questions", questionId);
-          const questionText = question.getString("text");
+          const questionText = question.getString("question");
           console.log(`[AudioGen] Question text (first 50 chars): ${questionText.substring(0, 50)}...`);
 
           // Try to generate audio with retry logic
@@ -275,51 +297,35 @@ onBootstrap((e) => {
           console.log(`[AudioGen] Starting audio generation attempts for question ${gameQuestion.id}`);
           while (attempts < 3 && audioContent === null) {
             try {
-              const apiKey = apiKeys[currentKeyIndex % apiKeys.length];
-              console.log(`[AudioGen] Attempt ${attempts + 1}/3 using API key index ${currentKeyIndex % apiKeys.length}`);
+              console.log(`[AudioGen] Attempt ${attempts + 1}/3`);
               audioContent = await generateAudio(questionText, apiKey);
               console.log(`[AudioGen] Successfully generated audio (${audioContent.length} bytes)`);
             } catch (err) {
               lastError = err;
               attempts++;
               console.error(`[AudioGen] Attempt ${attempts} failed:`, err.message);
-
-              // If rate limit, rotate immediately
-              if (err.message.includes("429")) {
-                console.log(`[AudioGen] Rate limit detected, rotating API key`);
-                currentKeyIndex++;
-              } else {
-                // For other errors, try next key
-                console.log(`[AudioGen] Error detected, trying next API key`);
-                currentKeyIndex++;
-              }
-
-              // Update job with new key index
-              const updateForm = new RecordUpsertForm($app, job);
-              updateForm.load({ current_api_key_index: currentKeyIndex });
-              updateForm.submit();
-              console.log(`[AudioGen] Updated job API key index to ${currentKeyIndex}`);
             }
           }
 
           if (audioContent) {
             console.log(`[AudioGen] Decoding and saving audio file for question ${gameQuestion.id}`);
-            // Decode base64 and save as file
-            const audioBytes = atob(audioContent);
-            const audioArray = new Uint8Array(audioBytes.length);
-            for (let i = 0; i < audioBytes.length; i++) {
-              audioArray[i] = audioBytes.charCodeAt(i);
-            }
+            // Decode base64 MP3 data
+            const mp3Data = base64ToBytes(audioContent);
+            console.log(`[AudioGen] Decoded MP3 data: ${mp3Data.length} bytes`);
             const filename = `${gameQuestion.id}.mp3`;
-            console.log(`[AudioGen] Decoded audio file: ${filename} (${audioArray.length} bytes)`);
+            console.log(`[AudioGen] MP3 file: ${filename} (${mp3Data.length} bytes)`);
 
-            // Create form with file
-            const fileForm = new RecordUpsertForm($app, gameQuestion);
-            const fileData = new FormData();
-            fileData.append('audio_file', new Blob([audioArray], { type: 'audio/mpeg' }), filename);
-            fileData.append('audio_status', 'available');
-            fileForm.loadFormData(fileData);
-            fileForm.submit();
+            // Write MP3 file to temporary location
+            const tempPath = `/tmp/audio_gen_${filename}`;
+            $os.writeFile(tempPath, mp3Data, 0o644);
+
+            // Use newer PocketBase v0.23+ API - files are set directly on the record
+            gameQuestion.set('audio_file', $filesystem.fileFromPath(tempPath));
+            gameQuestion.set('audio_status', 'available');
+            $app.save(gameQuestion);
+
+            // Clean up temp file
+            $os.remove(tempPath);
 
             console.log(`[AudioGen] Successfully saved audio for question ${gameQuestion.id}`);
           } else {
@@ -343,8 +349,8 @@ onBootstrap((e) => {
 
           processedCount++;
 
-          // Update job progress
-          const currentProgress = Math.floor((processedCount / gameQuestions.length) * 100);
+          // Update job progress (cap at 99 to avoid validation errors)
+          const currentProgress = Math.min(99, Math.floor((processedCount / gameQuestions.length) * 100));
           console.log(`[AudioGen] Updating job progress: ${processedCount}/${gameQuestions.length} (${currentProgress}%)`);
           const progressForm = new RecordUpsertForm($app, job);
           progressForm.load({
@@ -377,7 +383,7 @@ onBootstrap((e) => {
           const progressForm = new RecordUpsertForm($app, job);
           progressForm.load({
             processed_questions: processedCount,
-            progress: Math.floor((processedCount / gameQuestions.length) * 100),
+            progress: Math.min(99, Math.floor((processedCount / gameQuestions.length) * 100)),
             failed_questions: failedQuestions
           });
           progressForm.submit();
@@ -398,8 +404,7 @@ onBootstrap((e) => {
       console.error('[AudioGen] Worker error:', err);
       console.error('[AudioGen] Worker error stack:', err.stack);
     } finally {
-      console.log('[AudioGen] Worker finished processing, setting isProcessing = false');
-      isProcessing = false;
+      console.log('[AudioGen] Worker finished processing');
     }
   });
 
@@ -409,5 +414,5 @@ onBootstrap((e) => {
 
 // Export for testing
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { getGeminiApiKeys, generateAudio };
+  module.exports = { getGoogleCloudApiKey, generateAudio };
 }
