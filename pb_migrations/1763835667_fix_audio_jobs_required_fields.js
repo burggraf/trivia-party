@@ -10,25 +10,25 @@ migrate((app) => {
   // (PocketBase treats 0 as "blank" for required number fields)
 
   // Find and update progress field
-  const progressField = collection.fields.findOne((f) => f.name === "progress");
+  const progressField = collection.fields.find((f) => f.name === "progress");
   if (progressField) {
     progressField.required = false;
   }
 
   // Find and update total_questions field
-  const totalQuestionsField = collection.fields.findOne((f) => f.name === "total_questions");
+  const totalQuestionsField = collection.fields.find((f) => f.name === "total_questions");
   if (totalQuestionsField) {
     totalQuestionsField.required = false;
   }
 
   // Find and update processed_questions field
-  const processedQuestionsField = collection.fields.findOne((f) => f.name === "processed_questions");
+  const processedQuestionsField = collection.fields.find((f) => f.name === "processed_questions");
   if (processedQuestionsField) {
     processedQuestionsField.required = false;
   }
 
   // Find and update current_api_key_index field
-  const apiKeyIndexField = collection.fields.findOne((f) => f.name === "current_api_key_index");
+  const apiKeyIndexField = collection.fields.find((f) => f.name === "current_api_key_index");
   if (apiKeyIndexField) {
     apiKeyIndexField.required = false;
   }
@@ -42,22 +42,22 @@ migrate((app) => {
     return;
   }
 
-  const progressField = collection.fields.findOne((f) => f.name === "progress");
+  const progressField = collection.fields.find((f) => f.name === "progress");
   if (progressField) {
     progressField.required = true;
   }
 
-  const totalQuestionsField = collection.fields.findOne((f) => f.name === "total_questions");
+  const totalQuestionsField = collection.fields.find((f) => f.name === "total_questions");
   if (totalQuestionsField) {
     totalQuestionsField.required = true;
   }
 
-  const processedQuestionsField = collection.fields.findOne((f) => f.name === "processed_questions");
+  const processedQuestionsField = collection.fields.find((f) => f.name === "processed_questions");
   if (processedQuestionsField) {
     processedQuestionsField.required = true;
   }
 
-  const apiKeyIndexField = collection.fields.findOne((f) => f.name === "current_api_key_index");
+  const apiKeyIndexField = collection.fields.find((f) => f.name === "current_api_key_index");
   if (apiKeyIndexField) {
     apiKeyIndexField.required = true;
   }
