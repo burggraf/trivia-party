@@ -388,12 +388,19 @@ onBootstrap((e) => {
           gqForm.load({ audio_status: "generating" });
           gqForm.submit();
 
-          // Get question text
+          // Get question with all answers
           const questionId = gameQuestion.getString("question");
-          console.log(`[AudioGen] Fetching question text for question ID: ${questionId}`);
+          console.log(`[AudioGen] Fetching question data for question ID: ${questionId}`);
           const question = $app.findRecordById("questions", questionId);
           const questionText = question.getString("question");
+          const answerA = question.getString("answer_a");
+          const answerB = question.getString("answer_b");
+          const answerC = question.getString("answer_c");
+          const answerD = question.getString("answer_d");
+          const key = gameQuestion.getString("key");
+
           console.log(`[AudioGen] Question text (first 50 chars): ${questionText.substring(0, 50)}...`);
+          console.log(`[AudioGen] Shuffle key: ${key}`);
 
           // Try to generate audio with retry logic
           let audioContent = null;
