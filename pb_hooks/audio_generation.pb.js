@@ -402,6 +402,11 @@ onBootstrap((e) => {
           console.log(`[AudioGen] Question text (first 50 chars): ${questionText.substring(0, 50)}...`);
           console.log(`[AudioGen] Shuffle key: ${key}`);
 
+          // Build full audio text with shuffled answers
+          const fullAudioText = buildAudioText(questionText, answerA, answerB, answerC, answerD, key);
+          console.log(`[AudioGen] Full audio text (first 150 chars): ${fullAudioText.substring(0, 150)}...`);
+          console.log(`[AudioGen] Full audio text length: ${fullAudioText.length} chars`);
+
           // Try to generate audio with retry logic
           let audioContent = null;
           let attempts = 0;
@@ -411,7 +416,7 @@ onBootstrap((e) => {
           while (attempts < 3 && audioContent === null) {
             try {
               console.log(`[AudioGen] Attempt ${attempts + 1}/3`);
-              audioContent = await generateAudio(questionText, apiKey);
+              audioContent = await generateAudio(fullAudioText, apiKey);
               console.log(`[AudioGen] Successfully generated audio (${audioContent.length} bytes)`);
             } catch (err) {
               lastError = err;
