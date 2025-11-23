@@ -132,6 +132,69 @@ function seededShuffle(array, seed) {
   return shuffled;
 }
 
+/**
+ * Build audio text with question and shuffled answers
+ * Format: "Question? A. Answer. B. Answer. C. Answer. D. Answer."
+ *
+ * @param questionText - The question text
+ * @param answerA - Answer A (always correct in original order)
+ * @param answerB - Answer B
+ * @param answerC - Answer C
+ * @param answerD - Answer D
+ * @param key - Secure shuffle key from game_questions.key field
+ * @returns Formatted text for TTS with shuffled answers
+ */
+function buildAudioText(questionText, answerA, answerB, answerC, answerD, key) {
+  // Validate inputs
+  if (!key) {
+    console.warn('[AudioGen] Missing shuffle key, using original order');
+    // Fall back to original order if no key
+    const labels = ['A', 'B', 'C', 'D'];
+    const answers = [
+      answerA || "No answer provided",
+      answerB || "No answer provided",
+      answerC || "No answer provided",
+      answerD || "No answer provided"
+    ];
+    let text = questionText.trim();
+    if (!text.endsWith('?')) {
+      text += '?';
+    }
+    for (let i = 0; i < 4; i++) {
+      text += ` ${labels[i]}. ${answers[i]}.`;
+    }
+    return text;
+  }
+
+  // Original answers array (answer_a is always correct)
+  const originalAnswers = [
+    answerA || "No answer provided",
+    answerB || "No answer provided",
+    answerC || "No answer provided",
+    answerD || "No answer provided"
+  ];
+
+  // Shuffle indices using secure key as seed
+  const shuffledIndices = seededShuffle([0, 1, 2, 3], key);
+  const labels = ['A', 'B', 'C', 'D'];
+
+  // Add question mark if not present
+  let text = questionText.trim();
+  if (!text.endsWith('?')) {
+    text += '?';
+  }
+
+  // Append shuffled answers with labels
+  for (let i = 0; i < shuffledIndices.length; i++) {
+    const answerText = originalAnswers[shuffledIndices[i]];
+    text += ` ${labels[i]}. ${answerText}.`;
+  }
+
+  return text;
+}
+
+// ===== END SHUFFLE HELPERS =====
+
 // Start worker on app initialization
 onBootstrap((e) => {
   console.log('[AudioGen] Starting background worker');
