@@ -89,6 +89,33 @@ routerAdd("POST", "/api/games/{id}/generate-audio", (e) => {
   }
 });
 
+// ===== SHUFFLE HELPERS (ported from src/lib/answerShuffler.ts) =====
+
+/**
+ * A simple seeded random number generator (xorshift)
+ * This ensures the same seed always produces the same sequence of "random" numbers
+ * Ported from src/lib/answerShuffler.ts to maintain shuffle consistency
+ */
+function seededRandom(seed) {
+  // Convert string seed to number
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    const char = seed.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+
+  // Use xorshift algorithm for deterministic randomness
+  let x = hash || 1; // Ensure non-zero seed
+
+  return function() {
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    return (x >>> 0) / 0xFFFFFFFF; // Convert to [0, 1) float
+  };
+}
+
 // Start worker on app initialization
 onBootstrap((e) => {
   console.log('[AudioGen] Starting background worker');
