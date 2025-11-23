@@ -89,112 +89,6 @@ routerAdd("POST", "/api/games/{id}/generate-audio", (e) => {
   }
 });
 
-// ===== SHUFFLE HELPERS (ported from src/lib/answerShuffler.ts) =====
-
-/**
- * A simple seeded random number generator (xorshift)
- * This ensures the same seed always produces the same sequence of "random" numbers
- * Ported from src/lib/answerShuffler.ts to maintain shuffle consistency
- */
-function seededRandom(seed) {
-  // Convert string seed to number
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    const char = seed.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-
-  // Use xorshift algorithm for deterministic randomness
-  let x = hash || 1; // Ensure non-zero seed
-
-  return function() {
-    x ^= x << 13;
-    x ^= x >> 17;
-    x ^= x << 5;
-    return (x >>> 0) / 0xFFFFFFFF; // Convert to [0, 1) float
-  };
-}
-
-/**
- * Fisher-Yates shuffle using seeded random number generator
- * Ported from src/lib/answerShuffler.ts
- */
-function seededShuffle(array, seed) {
-  const shuffled = [...array];
-  const random = seededRandom(seed);
-
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-
-  return shuffled;
-}
-
-/**
- * Build audio text with question and shuffled answers
- * Format: "Question? A. Answer. B. Answer. C. Answer. D. Answer."
- *
- * @param questionText - The question text
- * @param answerA - Answer A (always correct in original order)
- * @param answerB - Answer B
- * @param answerC - Answer C
- * @param answerD - Answer D
- * @param key - Secure shuffle key from game_questions.key field
- * @returns Formatted text for TTS with shuffled answers
- */
-function buildAudioText(questionText, answerA, answerB, answerC, answerD, key) {
-  // Validate inputs
-  if (!key) {
-    console.warn('[AudioGen] Missing shuffle key, using original order');
-    // Fall back to original order if no key
-    const labels = ['A', 'B', 'C', 'D'];
-    const answers = [
-      answerA || "No answer provided",
-      answerB || "No answer provided",
-      answerC || "No answer provided",
-      answerD || "No answer provided"
-    ];
-    let text = questionText.trim();
-    if (!text.endsWith('?')) {
-      text += '?';
-    }
-    for (let i = 0; i < 4; i++) {
-      text += ` ${labels[i]}. ${answers[i]}.`;
-    }
-    return text;
-  }
-
-  // Original answers array (answer_a is always correct)
-  const originalAnswers = [
-    answerA || "No answer provided",
-    answerB || "No answer provided",
-    answerC || "No answer provided",
-    answerD || "No answer provided"
-  ];
-
-  // Shuffle indices using secure key as seed
-  const shuffledIndices = seededShuffle([0, 1, 2, 3], key);
-  const labels = ['A', 'B', 'C', 'D'];
-
-  // Add question mark if not present
-  let text = questionText.trim();
-  if (!text.endsWith('?')) {
-    text += '?';
-  }
-
-  // Append shuffled answers with labels
-  for (let i = 0; i < shuffledIndices.length; i++) {
-    const answerText = originalAnswers[shuffledIndices[i]];
-    text += ` ${labels[i]}. ${answerText}.`;
-  }
-
-  return text;
-}
-
-// ===== END SHUFFLE HELPERS =====
-
 // Start worker on app initialization
 onBootstrap((e) => {
   console.log('[AudioGen] Starting background worker');
@@ -206,6 +100,112 @@ onBootstrap((e) => {
   cronAdd("audioGenerationWorker", "* * * * *", async () => {
     console.log('[AudioGen] ===== CRON CALLBACK STARTED =====');
     console.log('[AudioGen] About to check stuck jobs');
+
+    // ===== SHUFFLE HELPERS (ported from src/lib/answerShuffler.ts) =====
+
+    /**
+     * A simple seeded random number generator (xorshift)
+     * This ensures the same seed always produces the same sequence of "random" numbers
+     * Ported from src/lib/answerShuffler.ts to maintain shuffle consistency
+     */
+    function seededRandom(seed) {
+      // Convert string seed to number
+      let hash = 0;
+      for (let i = 0; i < seed.length; i++) {
+        const char = seed.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32-bit integer
+      }
+
+      // Use xorshift algorithm for deterministic randomness
+      let x = hash || 1; // Ensure non-zero seed
+
+      return function() {
+        x ^= x << 13;
+        x ^= x >> 17;
+        x ^= x << 5;
+        return (x >>> 0) / 0xFFFFFFFF; // Convert to [0, 1) float
+      };
+    }
+
+    /**
+     * Fisher-Yates shuffle using seeded random number generator
+     * Ported from src/lib/answerShuffler.ts
+     */
+    function seededShuffle(array, seed) {
+      const shuffled = [...array];
+      const random = seededRandom(seed);
+
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+
+      return shuffled;
+    }
+
+    /**
+     * Build audio text with question and shuffled answers
+     * Format: "Question? A. Answer. B. Answer. C. Answer. D. Answer."
+     *
+     * @param questionText - The question text
+     * @param answerA - Answer A (always correct in original order)
+     * @param answerB - Answer B
+     * @param answerC - Answer C
+     * @param answerD - Answer D
+     * @param key - Secure shuffle key from game_questions.key field
+     * @returns Formatted text for TTS with shuffled answers
+     */
+    function buildAudioText(questionText, answerA, answerB, answerC, answerD, key) {
+      // Validate inputs
+      if (!key) {
+        console.warn('[AudioGen] Missing shuffle key, using original order');
+        // Fall back to original order if no key
+        const labels = ['A', 'B', 'C', 'D'];
+        const answers = [
+          answerA || "No answer provided",
+          answerB || "No answer provided",
+          answerC || "No answer provided",
+          answerD || "No answer provided"
+        ];
+        let text = questionText.trim();
+        if (!text.endsWith('?')) {
+          text += '?';
+        }
+        for (let i = 0; i < 4; i++) {
+          text += ` ${labels[i]}. ${answers[i]}.`;
+        }
+        return text;
+      }
+
+      // Original answers array (answer_a is always correct)
+      const originalAnswers = [
+        answerA || "No answer provided",
+        answerB || "No answer provided",
+        answerC || "No answer provided",
+        answerD || "No answer provided"
+      ];
+
+      // Shuffle indices using secure key as seed
+      const shuffledIndices = seededShuffle([0, 1, 2, 3], key);
+      const labels = ['A', 'B', 'C', 'D'];
+
+      // Add question mark if not present
+      let text = questionText.trim();
+      if (!text.endsWith('?')) {
+        text += '?';
+      }
+
+      // Append shuffled answers with labels
+      for (let i = 0; i < shuffledIndices.length; i++) {
+        const answerText = originalAnswers[shuffledIndices[i]];
+        text += ` ${labels[i]}. ${answerText}.`;
+      }
+
+      return text;
+    }
+
+    // ===== END SHUFFLE HELPERS =====
 
     // Helper: Get Google Cloud API key from settings (accessing at runtime when cron executes)
     function getGoogleCloudApiKey() {
