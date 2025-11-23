@@ -116,6 +116,22 @@ function seededRandom(seed) {
   };
 }
 
+/**
+ * Fisher-Yates shuffle using seeded random number generator
+ * Ported from src/lib/answerShuffler.ts
+ */
+function seededShuffle(array, seed) {
+  const shuffled = [...array];
+  const random = seededRandom(seed);
+
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  return shuffled;
+}
+
 // Start worker on app initialization
 onBootstrap((e) => {
   console.log('[AudioGen] Starting background worker');
