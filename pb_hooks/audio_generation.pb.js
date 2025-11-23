@@ -157,7 +157,7 @@ onBootstrap((e) => {
           input: { text: text },
           voice: {
             languageCode: 'en-US',
-            name: 'en-US-Standard-A'  // Standard voice (lower cost)
+            name: 'en-US-Standard-J'  // Standard voice (lower cost)
           },
           audioConfig: {
             audioEncoding: 'MP3'

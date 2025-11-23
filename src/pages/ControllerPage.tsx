@@ -46,6 +46,8 @@ interface GameData {
     d: string
     correct_answer?: string
     submitted_answer?: string
+    audio_file?: string
+    audio_status?: string
   }
   timer?: {
     startedAt: string
@@ -612,7 +614,9 @@ export default function ControllerPage() {
                 a: shuffled.shuffledAnswers[0].text,
                 b: shuffled.shuffledAnswers[1].text,
                 c: shuffled.shuffledAnswers[2].text,
-                d: shuffled.shuffledAnswers[3].text
+                d: shuffled.shuffledAnswers[3].text,
+                audio_file: (gameQuestion as any).audio_file,
+                audio_status: (gameQuestion as any).audio_status
               }
             }
             // Add timer if configured (question timer, not revealed yet)
@@ -696,7 +700,9 @@ export default function ControllerPage() {
                 a: shuffled.shuffledAnswers[0].text,
                 b: shuffled.shuffledAnswers[1].text,
                 c: shuffled.shuffledAnswers[2].text,
-                d: shuffled.shuffledAnswers[3].text
+                d: shuffled.shuffledAnswers[3].text,
+                audio_file: (gameQuestion as any).audio_file,
+                audio_status: (gameQuestion as any).audio_status
               }
             }
             // Add timer if configured (question timer, not revealed yet)
@@ -839,7 +845,9 @@ export default function ControllerPage() {
                   a: shuffled.shuffledAnswers[0].text,
                   b: shuffled.shuffledAnswers[1].text,
                   c: shuffled.shuffledAnswers[2].text,
-                  d: shuffled.shuffledAnswers[3].text
+                  d: shuffled.shuffledAnswers[3].text,
+                  audio_file: (gameQuestion as any).audio_file,
+                  audio_status: (gameQuestion as any).audio_status
                 }
               })
             }

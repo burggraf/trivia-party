@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
+import { Button } from '@/components/ui/button'
+import { Volume2 } from 'lucide-react'
 import pb from '@/lib/pocketbase'
 import { gameAnswersService } from '@/lib/gameAnswers'
 import { GameScoreboard, ScoreboardPlayer } from '@/types/games'
@@ -29,6 +31,8 @@ interface RoundPlayDisplayProps {
       d: string
       correct_answer?: string
       submitted_answer?: string
+      audio_file?: string
+      audio_status?: string
     }
     // These are added by GamePage for player interaction
     playerTeam?: string
@@ -50,6 +54,70 @@ export default function RoundPlayDisplay({ gameData, mode = 'controller', onAnsw
   const [selectedTeam, setSelectedTeam] = useState<{ name: string; players: ScoreboardPlayer[] } | null>(null)
   const [teamModalOpen, setTeamModalOpen] = useState(false)
   const [showEmptyTeams, setShowEmptyTeams] = useState(false)
+  const controllerAudioRef = useRef<HTMLAudioElement | null>(null)
+
+  const playControllerAudio = () => {
+    if (!gameData.question) {
+      console.log('[Controller Audio] No question data')
+      return
+    }
+
+    const question = gameData.question as any
+    console.log('[Controller Audio] Question data:', {
+      id: question.id,
+      audio_status: question.audio_status,
+      audio_file: question.audio_file,
+      hasAudioFile: !!question.audio_file
+    })
+
+    if (question.audio_status === 'available' && question.audio_file) {
+      try {
+        // Stop any currently playing audio
+        if (controllerAudioRef.current) {
+          controllerAudioRef.current.pause()
+          controllerAudioRef.current = null
+        }
+
+        // Manually construct the URL since question.id is the game_questions record ID
+        // Use PocketBase's file URL helper with a mock record object
+        const mockRecord = {
+          id: question.id,
+          collectionId: '',
+          collectionName: 'game_questions',
+          created: '',
+          updated: ''
+        }
+        const audioUrl = pb.files.getURL(mockRecord, question.audio_file)
+        console.log('[Controller Audio] Generated audio URL:', audioUrl)
+
+        const audio = new Audio(audioUrl)
+        controllerAudioRef.current = audio
+
+        audio.addEventListener('loadeddata', () => console.log('[Controller Audio] Audio loaded'))
+        audio.addEventListener('error', (e) => {
+          console.error('[Controller Audio] Audio error event:', {
+            error: e,
+            code: audio.error?.code,
+            message: audio.error?.message
+          })
+        })
+
+        console.log('[Controller Audio] Attempting to play...')
+        audio.play()
+          .then(() => console.log('[Controller Audio] Playing'))
+          .catch(err => {
+            console.error('[Controller Audio] Play failed:', {
+              name: err.name,
+              message: err.message
+            })
+          })
+      } catch (err) {
+        console.error('[Controller Audio] Error loading audio:', err)
+      }
+    } else {
+      console.log('[Controller Audio] Audio not available')
+    }
+  }
 
   const handleTeamClick = (teamName: string, players: ScoreboardPlayer[]) => {
     setSelectedTeam({ name: teamName, players })
@@ -217,9 +285,22 @@ export default function RoundPlayDisplay({ gameData, mode = 'controller', onAnsw
     <div className="text-center mb-8">
       {/* Round Progress - Consistent header showing round and question info */}
       <div className="mb-4 md:mb-6">
-        <h2 className="text-lg md:text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">
-          Round {roundNumber} of {totalRounds} - Question {questionNumber}
-        </h2>
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <h2 className="text-lg md:text-2xl font-bold text-slate-800 dark:text-slate-100">
+            Round {roundNumber} of {totalRounds} - Question {questionNumber}
+          </h2>
+          {mode === 'controller' && gameData.question?.audio_status === 'available' && gameData.question?.audio_file && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={playControllerAudio}
+              className="h-8 w-8 p-0"
+              title="Play question audio"
+            >
+              <Volume2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
         <div className="flex flex-row items-center justify-between px-4">
           <Badge variant="secondary" className="text-xs md:text-sm px-2 py-1 md:px-3 md:py-1">
             {gameData.question.category}
