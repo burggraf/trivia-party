@@ -7,6 +7,15 @@ set -e  # Exit on any error
 
 echo "🚀 Setting up Trivia Party development environment..."
 
+# Load environment variables from .env file
+if [ -f ".env" ]; then
+    echo "📝 Loading environment variables from .env..."
+    set -a  # Automatically export all variables
+    source .env
+    set +a  # Stop auto-exporting
+    echo "✅ Environment variables loaded"
+fi
+
 # Kill any existing PocketBase server on port 8090
 echo "🔄 Stopping any existing PocketBase server on port 8090..."
 if lsof -Pi :8090 -sTCP:LISTEN -t >/dev/null ; then

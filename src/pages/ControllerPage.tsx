@@ -22,6 +22,7 @@ import TeamCard from '@/components/games/TeamCard'
 import FloatingActionBar from '@/components/games/FloatingActionBar'
 import { getPublicUrl } from '@/lib/networkUrl'
 import OnlinePlayersPanel from '@/components/games/OnlinePlayersPanel'
+import * as aiHostEvents from '@/lib/aiHostEvents'
 
 type GameState = 'game-start' | 'round-start' | 'round-play' | 'round-end' | 'game-end' | 'thanks' | 'return-to-lobby'
 
@@ -543,6 +544,15 @@ export default function ControllerPage() {
               }
             }
 
+            // Create AI host event for question end
+            if (id && gameData.round) {
+              await aiHostEvents.questionEndEvent(
+                id,
+                gameData.round.round_number,
+                gameData.question?.question_number || 1
+              )
+            }
+
             // Update game data with correct answer
             const newGameData: GameData = {
               state: 'round-play',
@@ -560,11 +570,22 @@ export default function ControllerPage() {
 
             console.log(`🎯 All answers graded. Correct answer: ${correctAnswerLabel}`)
 
+            // Create AI host event for answer reveal
+            if (id) {
+              const correctAnswerText = gameData.question?.[correctAnswerLabel.toLowerCase() as 'a' | 'b' | 'c' | 'd'] || correctAnswerLabel
+              await aiHostEvents.answerRevealEvent(id, correctAnswerText)
+            }
+
             // Update scoreboard with latest scores
             console.log('🔴 BEFORE updateScoreboard call - Game ID:', id, 'Round:', gameData.round?.round_number)
             try {
               await scoreboardService.updateScoreboard(id, gameData.round?.round_number || 1)
               console.log('🟢 AFTER updateScoreboard call - Success!')
+
+              // Create AI host event for scores update
+              if (id) {
+                await aiHostEvents.scoresUpdateEvent(id)
+              }
             } catch (error) {
               console.error('🔴 AFTER updateScoreboard call - Failed:', error)
               // Don't block game flow if scoreboard update fails
@@ -625,11 +646,28 @@ export default function ControllerPage() {
 
             await updateGameDataClean(newGameData)
             console.log('🔍 DEBUG: Next question loaded successfully')
+
+            // Create AI host event for question start
+            if (id && gameData.round) {
+              await aiHostEvents.questionStartEvent(
+                id,
+                gameData.round.round_number,
+                nextQuestionNumber,
+                gameQuestion.id,
+                nextQuestion.id
+              )
+            }
           }
           return
         } else {
           // End of round
           console.log('🔍 DEBUG: Ending round')
+
+          // Create AI host event for round end
+          if (id && gameData.round) {
+            await aiHostEvents.roundEndEvent(id, gameData.round.round_number)
+          }
+
           const newGameData: GameData = {
             state: 'round-end',
             round: gameData.round
@@ -650,6 +688,11 @@ export default function ControllerPage() {
         // Move to first round
         const firstRound = await createRoundObject(0)
         if (firstRound) {
+          // Create AI host event for game start
+          if (id) {
+            await aiHostEvents.gameStartEvent(id)
+          }
+
           const newGameData: GameData = {
             state: 'round-start',
             round: firstRound
@@ -673,6 +716,11 @@ export default function ControllerPage() {
         const currentRoundIndex = getCurrentRoundIndex()
         const currentRound = rounds[currentRoundIndex]
         if (currentRound) {
+          // Create AI host event for round start
+          if (id && gameData.round) {
+            await aiHostEvents.roundStartEvent(id, gameData.round.round_number)
+          }
+
           const gameQuestions = await gameQuestionsService.getGameQuestions(currentRound.id)
           if (gameQuestions.length > 0) {
             const firstQuestion = await questionsService.getQuestionById(gameQuestions[0].question)
@@ -710,6 +758,17 @@ export default function ControllerPage() {
             if (timer) newGameData.timer = timer
 
             await updateGameDataClean(newGameData)
+
+            // Create AI host event for question start
+            if (id && gameData.round) {
+              await aiHostEvents.questionStartEvent(
+                id,
+                gameData.round.round_number,
+                1,
+                gameQuestion.id,
+                firstQuestion.id
+              )
+            }
           }
         }
         break
@@ -734,6 +793,11 @@ export default function ControllerPage() {
           }
         } else {
           // All rounds completed, go to game-end
+          // Create AI host event for game end
+          if (id) {
+            await aiHostEvents.gameEndEvent(id)
+          }
+
           const newGameData: GameData = {
             state: 'game-end'
           }

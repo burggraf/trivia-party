@@ -7,13 +7,32 @@ import GameEnd from '@/components/states/GameEnd'
 import Thanks from '@/components/states/Thanks'
 import { CircularTimerFixed } from '@/components/ui/circular-timer'
 import { GameData } from '@/types/games'
+import { AIHostController } from '@/lib/aiHostController'
 import * as React from 'react'
 
 export function GameDisplay() {
   const { gameRecord } = useDisplay()
   const [timerKey, setTimerKey] = React.useState(0)
+  const aiHostRef = React.useRef<AIHostController | null>(null)
 
   const gameData = gameRecord?.data as GameData | undefined
+
+  // Initialize AI Host Controller when game starts
+  React.useEffect(() => {
+    if (!gameRecord?.id) return
+
+    const aiHost = new AIHostController(gameRecord.id)
+    aiHostRef.current = aiHost
+
+    // Start the AI host (connects to Gemini and subscribes to events)
+    aiHost.start().catch(err => {
+      console.error('[GameDisplay] Failed to start AI host:', err)
+    })
+
+    return () => {
+      aiHost.stop()
+    }
+  }, [gameRecord?.id])
 
   // Update timer display every second
   React.useEffect(() => {
@@ -122,6 +141,7 @@ export function GameDisplay() {
           </div>
         </div>
       )}
+
     </>
   )
 }

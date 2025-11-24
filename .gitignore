@@ -48,6 +48,13 @@ lerna-debug.log*
 *.tsv
 *.csv
 
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+*-service-account-*.json
+service-account-key.json
+
 # Playwright
 test-results/
 playwright-report/
