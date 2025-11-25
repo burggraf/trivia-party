@@ -1,8 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Volume2 } from 'lucide-react'
 import pb from '@/lib/pocketbase'
 import { gameAnswersService } from '@/lib/gameAnswers'
 import { GameScoreboard } from '@/types/games'
@@ -29,8 +27,6 @@ interface RoundPlayDisplayProps {
       d: string
       correct_answer?: string
       submitted_answer?: string
-      audio_file?: string
-      audio_status?: string
     }
     // These are added by GamePage for player interaction
     playerTeam?: string
@@ -47,8 +43,6 @@ interface RoundPlayDisplayProps {
 export default function RoundPlayDisplay({ gameData, mode = 'controller', onAnswerSubmit, gameId, scoreboard }: RoundPlayDisplayProps) {
   const [teamAnswerStatus, setTeamAnswerStatus] = useState<Map<string, { answered: boolean, isCorrect?: boolean }>>(new Map()) // Track which teams have answered and their correctness
   const { textSize } = useTextSize()
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  const controllerAudioRef = useRef<HTMLAudioElement | null>(null)
 
   // Get text size classes based on the current text size setting
   const getTextSizeClasses = () => {
@@ -82,68 +76,6 @@ export default function RoundPlayDisplay({ gameData, mode = 'controller', onAnsw
   }
 
   const textSizeClasses = getTextSizeClasses()
-
-  const playControllerAudio = () => {
-    if (!gameData.question) {
-      console.log('[Display Controller Audio] No question data')
-      return
-    }
-
-    const question = gameData.question as any
-    console.log('[Display Controller Audio] Question data:', {
-      id: question.id,
-      audio_status: question.audio_status,
-      audio_file: question.audio_file,
-      hasAudioFile: !!question.audio_file
-    })
-
-    if (question.audio_status === 'available' && question.audio_file) {
-      try {
-        // Stop any currently playing audio
-        if (controllerAudioRef.current) {
-          controllerAudioRef.current.pause()
-          controllerAudioRef.current = null
-        }
-
-        // Use PocketBase's file URL helper with a mock record object
-        const mockRecord = {
-          id: question.id,
-          collectionId: '',
-          collectionName: 'game_questions',
-          created: '',
-          updated: ''
-        }
-        const audioUrl = pb.files.getURL(mockRecord, question.audio_file)
-        console.log('[Display Controller Audio] Generated audio URL:', audioUrl)
-
-        const audio = new Audio(audioUrl)
-        controllerAudioRef.current = audio
-
-        audio.addEventListener('loadeddata', () => console.log('[Display Controller Audio] Audio loaded'))
-        audio.addEventListener('error', (e) => {
-          console.error('[Display Controller Audio] Audio error event:', {
-            error: e,
-            code: audio.error?.code,
-            message: audio.error?.message
-          })
-        })
-
-        console.log('[Display Controller Audio] Attempting to play...')
-        audio.play()
-          .then(() => console.log('[Display Controller Audio] Playing'))
-          .catch(err => {
-            console.error('[Display Controller Audio] Play failed:', {
-              name: err.name,
-              message: err.message
-            })
-          })
-      } catch (err) {
-        console.error('[Display Controller Audio] Error loading audio:', err)
-      }
-    } else {
-      console.log('[Display Controller Audio] Audio not available')
-    }
-  }
 
   // Reset team answer status when question changes
   useEffect(() => {
@@ -205,76 +137,6 @@ export default function RoundPlayDisplay({ gameData, mode = 'controller', onAnsw
     }
   }, [mode, gameId, gameData.question?.id])
 
-  // Play audio when question changes
-  useEffect(() => {
-    if (!gameData.question) return
-
-    // Clean up previous audio
-    if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current = null
-    }
-
-    // Check if audio is available
-    const currentQuestion = gameData.question as any
-    console.log('[Audio] Question changed:', {
-      questionId: currentQuestion.id,
-      audio_status: currentQuestion.audio_status,
-      audio_file: currentQuestion.audio_file,
-      hasAudioFile: !!currentQuestion.audio_file
-    })
-
-    if (currentQuestion.audio_status === 'available' && currentQuestion.audio_file) {
-      try {
-        const audioUrl = pb.files.getUrl(currentQuestion, currentQuestion.audio_file)
-        console.log('[Audio] Generated audio URL:', audioUrl)
-
-        const audio = new Audio(audioUrl)
-        audioRef.current = audio
-
-        // Add event listeners for debugging
-        audio.addEventListener('loadstart', () => console.log('[Audio] Load started'))
-        audio.addEventListener('loadeddata', () => console.log('[Audio] Data loaded'))
-        audio.addEventListener('canplay', () => console.log('[Audio] Can play'))
-        audio.addEventListener('playing', () => console.log('[Audio] Playing'))
-        audio.addEventListener('error', (e) => {
-          console.error('[Audio] Error event:', {
-            error: e,
-            code: audio.error?.code,
-            message: audio.error?.message
-          })
-        })
-
-        console.log('[Audio] Attempting to play...')
-        audio.play()
-          .then(() => {
-            console.log('[Audio] Play promise resolved - audio is playing')
-          })
-          .catch(err => {
-            console.error('[Audio] Play promise rejected:', {
-              name: err.name,
-              message: err.message,
-              code: err.code
-            })
-            // Silently fail - question still displays
-          })
-      } catch (err) {
-        console.error('[Audio] Exception loading audio:', err)
-        // Silently fail - question still displays
-      }
-    } else {
-      console.log('[Audio] No audio available for this question')
-    }
-
-    // Cleanup on unmount
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current = null
-      }
-    }
-  }, [gameData.question, gameData.question?.id])
-
   // Show answer if correct_answer exists in the data
   const shouldShowAnswer = !!gameData.question?.correct_answer
 
@@ -328,22 +190,9 @@ export default function RoundPlayDisplay({ gameData, mode = 'controller', onAnsw
         <Badge variant="secondary" className="text-xs px-2 py-0.5">
           {gameData.question.category}
         </Badge>
-        <div className="flex items-center gap-1">
-          <h2 className="text-xs md:text-sm font-bold text-slate-800 dark:text-slate-100">
-            Round {roundNumber} of {totalRounds} - Question {questionNumber}
-          </h2>
-          {mode === 'controller' && gameData.question?.audio_status === 'available' && gameData.question?.audio_file && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={playControllerAudio}
-              className="h-6 w-6 p-0"
-              title="Play question audio"
-            >
-              <Volume2 className="h-3 w-3" />
-            </Button>
-          )}
-        </div>
+        <h2 className="text-xs md:text-sm font-bold text-slate-800 dark:text-slate-100">
+          Round {roundNumber} of {totalRounds} - Question {questionNumber}
+        </h2>
         <Badge variant="outline" className="text-xs px-2 py-0.5">
           {gameData.question.difficulty}
         </Badge>
