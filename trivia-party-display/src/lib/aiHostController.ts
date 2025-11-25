@@ -4,19 +4,28 @@
  * Subscribes to game record changes from PocketBase and triggers AI voice responses
  * via the Gemini Live API. Detects state transitions by comparing previous and current
  * game data, eliminating the need for a separate game_events collection.
+ *
+ * Prompts are designed to give Gemini the DATA and INTENT, allowing its personality
+ * to drive the actual delivery for natural, varied, human-like speech.
  */
 
 import pb from './pocketbase';
 import { GeminiLiveClient } from './geminiLiveClient';
 import type { ConnectionState } from '@/types/gemini';
 import type { GamesRecord } from '@/types/pocketbase-types';
-import type { GameData, GameState } from '@/types/games';
+import type { GameData, GameState, ScoreboardTeam } from '@/types/games';
 
 interface TrackedState {
   state: GameState | null;
   roundNumber: number | null;
   questionNumber: number | null;
   answerRevealed: boolean;
+}
+
+interface TeamScore {
+  name: string;
+  score: number;
+  players: string[];
 }
 
 export class AIHostController {
@@ -98,12 +107,12 @@ export class AIHostController {
 
     // Game start: state changed to round-start from game-start (or first time seeing round-start)
     if (current.state === 'round-start' && prev.state === 'game-start') {
-      this.handleGameStart(game);
+      this.handleGameStart(game, gameData);
     }
 
     // Round start: entering round-start state (new round)
     if (current.state === 'round-start' && prev.state !== 'round-start') {
-      this.handleRoundStart(gameData);
+      this.handleRoundStart(game, gameData);
     }
 
     // Question start: new question in round-play
@@ -127,7 +136,7 @@ export class AIHostController {
 
     // Round end: entering round-end state
     if (current.state === 'round-end' && prev.state !== 'round-end') {
-      this.handleRoundEnd(gameData);
+      this.handleRoundEnd(game, gameData);
     }
 
     // Game end: entering game-end state
@@ -136,27 +145,144 @@ export class AIHostController {
     }
   }
 
-  private handleGameStart(game: GamesRecord): void {
-    const teamCount = game.scoreboard?.teams ? Object.keys(game.scoreboard.teams).length : 0;
+  /**
+   * Extract team data with players from scoreboard
+   */
+  private getTeamsWithPlayers(game: GamesRecord): TeamScore[] {
+    if (!game.scoreboard?.teams) {
+      return [];
+    }
 
-    this.geminiClient.sendMessage(
-      `Welcome everyone to ${game.name}! We have ${teamCount} teams competing today. ` +
-      `Are you ready to test your trivia knowledge? Let's get started!`
-    );
+    return Object.values(game.scoreboard.teams)
+      .map((team: ScoreboardTeam) => ({
+        name: team.name,
+        score: team.score,
+        players: team.players?.map(p => p.name).filter(Boolean) || [],
+      }))
+      .sort((a, b) => b.score - a.score);
   }
 
-  private handleRoundStart(gameData: GameData): void {
-    const roundNumber = gameData.round?.round_number ?? '?';
-    const totalRounds = gameData.round?.rounds ?? '?';
-    const category = gameData.round?.title || gameData.round?.categories?.[0];
+  /**
+   * Build a detailed scoreboard summary for commentary
+   */
+  private buildScoreboardSummary(teams: TeamScore[]): string {
+    if (teams.length === 0) return 'No teams yet.';
 
-    let message = `Alright folks, here comes Round ${roundNumber} of ${totalRounds}! `;
-    if (category) {
-      message += `This round's category is: ${category}. `;
+    const lines = teams.map((team, i) => {
+      const position = i + 1;
+      const playerList = team.players.length > 0
+        ? ` (players: ${team.players.join(', ')})`
+        : '';
+      return `${position}. ${team.name}: ${team.score} points${playerList}`;
+    });
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Analyze score gaps for commentary hints
+   */
+  private analyzeScores(teams: TeamScore[]): string {
+    if (teams.length < 2) return '';
+
+    const hints: string[] = [];
+    const leader = teams[0];
+    const second = teams[1];
+    const last = teams[teams.length - 1];
+    const gap = leader.score - second.score;
+
+    if (gap === 0) {
+      const tiedTeams = teams.filter(t => t.score === leader.score);
+      if (tiedTeams.length > 2) {
+        hints.push(`${tiedTeams.length}-way tie at the top!`);
+      } else {
+        hints.push(`${leader.name} and ${second.name} are tied!`);
+      }
+    } else if (gap <= 2) {
+      hints.push(`Very close race - only ${gap} point${gap === 1 ? '' : 's'} separating the top teams.`);
+    } else if (gap >= 10) {
+      hints.push(`${leader.name} has a commanding lead of ${gap} points.`);
     }
-    message += `Get your thinking caps on and let's see what questions we have in store.`;
 
-    this.geminiClient.sendMessage(message);
+    if (teams.length > 2 && last.score < leader.score - 5) {
+      hints.push(`${last.name} will need a strong comeback.`);
+    }
+
+    return hints.join(' ');
+  }
+
+  private handleGameStart(game: GamesRecord, gameData: GameData): void {
+    const teams = this.getTeamsWithPlayers(game);
+    const totalRounds = gameData.round?.rounds ?? '?';
+
+    const teamIntros = teams.map(team => {
+      if (team.players.length > 0) {
+        return `Team "${team.name}" with players: ${team.players.join(', ')}`;
+      }
+      return `Team "${team.name}"`;
+    }).join('\n');
+
+    const prompt = `[GAME STARTING - WELCOME EVERYONE]
+
+=== GAME INFO ===
+Game name: "${game.name}"
+Total rounds: ${totalRounds}
+Number of teams: ${teams.length}
+
+=== TEAMS & PLAYERS ===
+${teamIntros || 'No teams registered yet'}
+
+=== YOUR TASK ===
+Welcome everyone to this trivia game! This is your opening - make it memorable.
+- Introduce yourself briefly (you're Terry, the host)
+- Mention the game name
+- Introduce each team by name and call out their players
+- Build excitement for the competition ahead
+- Mention how many rounds we'll be playing
+
+BE SPONTANEOUS! Vary your delivery - don't use the same phrases every time.
+Have fun with the team names. Make players feel welcomed and pumped up.
+Keep it energetic but not too long - about 20-30 seconds.`;
+
+    this.geminiClient.sendMessage(prompt);
+  }
+
+  private handleRoundStart(game: GamesRecord, gameData: GameData): void {
+    const roundNumber = gameData.round?.round_number ?? 1;
+    const totalRounds = gameData.round?.rounds;
+    const questionCount = gameData.round?.question_count ?? '?';
+    const category = gameData.round?.title || gameData.round?.categories?.[0] || null;
+    const teams = this.getTeamsWithPlayers(game);
+    const isFinalRound = totalRounds ? roundNumber === totalRounds : false;
+    const roundsRemaining = totalRounds ? totalRounds - roundNumber : null;
+
+    // Only show scores if not round 1
+    const scoreSection = roundNumber > 1 ? `
+=== CURRENT STANDINGS ===
+${this.buildScoreboardSummary(teams)}
+
+Score analysis: ${this.analyzeScores(teams) || 'Everyone starting fresh!'}` : '';
+
+    const prompt = `[ROUND ${roundNumber} STARTING]
+
+=== ROUND INFO ===
+Round: ${roundNumber}${totalRounds ? ` of ${totalRounds}` : ''}
+Questions this round: ${questionCount}
+${category ? `Category: ${category}` : 'Category: Mixed/General'}
+${scoreSection}
+
+=== YOUR TASK ===
+Announce that Round ${roundNumber} is starting!
+${category ? `- Mention the category: "${category}"` : '- Let them know it\'s a mixed category round'}
+- Tell them how many questions are in this round
+${roundNumber > 1 ? '- Briefly acknowledge the current standings (who\'s leading, any close races)' : '- This is round 1, so everyone starts at zero - mention the fresh start'}
+${isFinalRound ? '- THIS IS THE FINAL ROUND! Build drama and tension!' : roundsRemaining ? `- Mention there ${roundsRemaining === 1 ? 'is 1 round' : `are ${roundsRemaining} rounds`} left after this one` : ''}
+
+BE SPONTANEOUS! Vary your energy and phrasing.
+${roundNumber > 1 ? 'React naturally to the scores - is it close? Is someone running away with it?' : ''}
+Keep it punchy - about 10-15 seconds.`;
+
+    this.geminiClient.sendMessage(prompt);
   }
 
   private handleQuestionStart(gameData: GameData): void {
@@ -168,18 +294,40 @@ export class AIHostController {
 
     const questionNumber = question.question_number;
     const totalQuestions = gameData.round?.question_count ?? '?';
+    const category = question.category || gameData.round?.title || 'General';
+    const difficulty = question.difficulty || 'Medium';
+    const isLastQuestion = questionNumber === totalQuestions;
+    const isFirstQuestion = questionNumber === 1;
 
-    const prompt = `Here's question ${questionNumber} of ${totalQuestions}:
+    const prompt = `[QUESTION TIME]
 
-${question.question}
+=== QUESTION INFO ===
+Question ${questionNumber} of ${totalQuestions}
+Category: ${category}
+Difficulty: ${difficulty}
+${isFirstQuestion ? '(First question of the round!)' : ''}
+${isLastQuestion ? '(LAST QUESTION of this round!)' : ''}
 
-Your answer choices are:
-A. ${question.a}
-B. ${question.b}
-C. ${question.c}
-D. ${question.d}
+=== THE QUESTION ===
+"${question.question}"
 
-Take your time everyone, discuss with your team, and submit your answers!`;
+=== ANSWER CHOICES ===
+A: ${question.a}
+B: ${question.b}
+C: ${question.c}
+D: ${question.d}
+
+=== YOUR TASK ===
+Present this question to the teams!
+- Read the question clearly and with good pacing
+- Read ALL FOUR answer choices (A, B, C, D) clearly
+- ${isLastQuestion ? 'Build tension - this is the last question of the round!' : ''}
+- ${isFirstQuestion ? 'Set the tone - first question, let\'s see what they\'ve got!' : ''}
+- Encourage teams to discuss and submit their answers
+
+IMPORTANT: You MUST read the full question and ALL answer choices clearly.
+Add your own flair - maybe a quick reaction to an interesting question,
+build suspense, or comment on the difficulty. Keep each delivery fresh!`;
 
     this.geminiClient.sendMessage(prompt);
   }
@@ -197,92 +345,127 @@ Take your time everyone, discuss with your team, and submit your answers!`;
       return;
     }
 
-    // Get the full answer text
     const answerKey = correctAnswer.toLowerCase() as 'a' | 'b' | 'c' | 'd';
     const answerText = question[answerKey] || correctAnswer;
+    const teams = this.getTeamsWithPlayers(game);
 
-    // Build context about team performance for this question
-    const teamResults = this.getTeamResultsSummary(game);
+    const prompt = `[ANSWER REVEAL]
 
-    // Request fun fact generation on-the-fly
-    const prompt = `The correct answer is ${correctAnswer}: ${answerText}!
+=== THE ANSWER ===
+Correct answer: ${correctAnswer}
+Full answer: "${answerText}"
 
-${teamResults}
+=== THE QUESTION WAS ===
+"${question.question}"
 
-Please share a brief interesting fact related to this question or answer. Keep it concise and engaging.
+=== CURRENT SCORES ===
+${this.buildScoreboardSummary(teams)}
 
-Question was: ${question.question}`;
+=== YOUR TASK ===
+Reveal the correct answer!
+- Announce that the answer is ${correctAnswer}: "${answerText}"
+- React naturally - was it tricky? Surprising? A classic?
+- Share a brief interesting tidbit or fun fact related to the answer (make it educational!)
+- Keep the energy up
+
+BE SPONTANEOUS! Vary how you reveal answers - sometimes dramatic pause,
+sometimes quick reveal, sometimes playful teasing. Keep it fresh and engaging!
+About 15-20 seconds including the fun fact.`;
 
     this.geminiClient.sendMessage(prompt);
   }
 
-  private getTeamResultsSummary(game: GamesRecord): string {
-    if (!game.scoreboard?.teams) {
-      return '';
-    }
+  private handleRoundEnd(game: GamesRecord, gameData: GameData): void {
+    const roundNumber = gameData.round?.round_number ?? 1;
+    const totalRounds = gameData.round?.rounds;
+    const roundsRemaining = totalRounds ? totalRounds - roundNumber : null;
+    const isFinalRound = totalRounds ? roundNumber === totalRounds : false;
+    const teams = this.getTeamsWithPlayers(game);
+    const scoreAnalysis = this.analyzeScores(teams);
 
-    const teams = Object.values(game.scoreboard.teams);
-    if (teams.length === 0) {
-      return '';
-    }
+    const roundsRemainingText = roundsRemaining !== null
+      ? (roundsRemaining === 1 ? '1 round' : `${roundsRemaining} rounds`)
+      : 'more rounds';
 
-    // Get leader info
-    const sortedTeams = [...teams].sort((a, b) => b.score - a.score);
-    const leader = sortedTeams[0];
+    const prompt = `[ROUND ${roundNumber} COMPLETE]
 
-    if (sortedTeams.length === 1) {
-      return `${leader.name} has ${leader.score} points.`;
-    }
+=== ROUND SUMMARY ===
+Completed: Round ${roundNumber}${totalRounds ? ` of ${totalRounds}` : ''}
+${isFinalRound ? '>>> THIS WAS THE FINAL ROUND! <<<' : `Rounds remaining: ${roundsRemainingText}`}
 
-    return `${leader.name} is currently leading with ${leader.score} points.`;
-  }
+=== FULL SCOREBOARD ===
+${this.buildScoreboardSummary(teams)}
 
-  private handleRoundEnd(gameData: GameData): void {
-    const roundNumber = gameData.round?.round_number ?? '?';
-    const totalRounds = gameData.round?.rounds ?? '?';
-    const isFinalRound = roundNumber === totalRounds;
+=== SCORE ANALYSIS ===
+${scoreAnalysis || 'Scores are spread out.'}
 
-    this.geminiClient.sendMessage(
-      `And that's the end of Round ${roundNumber}! ` +
-      (isFinalRound
-        ? `What a great final round! Let's see the final scores.`
-        : `Great job everyone! Let's see the current standings before we move on.`)
-    );
+=== YOUR TASK ===
+Wrap up Round ${roundNumber} and discuss the scores!
+
+MUST COVER:
+- Announce the round is complete
+- Go through the current standings - mention EVERY team by name and their score
+- Comment on the race: Who's leading? How close is it? Any surprises?
+- ${isFinalRound
+    ? 'THIS IS IT! The game is over! Build to the final results (game end announcement comes next)'
+    : `Mention there ${roundsRemainingText === '1 round' ? 'is' : 'are'} ${roundsRemainingText} left - can trailing teams catch up?`}
+
+BE SPONTANEOUS! React genuinely to the standings.
+- If it's close, build the tension!
+- If someone's dominating, acknowledge it
+- If there's an underdog, root for the comeback
+- Use team names naturally in your commentary
+
+This is a key moment - take about 20-30 seconds to really break down the standings.`;
+
+    this.geminiClient.sendMessage(prompt);
   }
 
   private handleGameEnd(game: GamesRecord): void {
-    if (!game.scoreboard?.teams) {
+    const teams = this.getTeamsWithPlayers(game);
+
+    if (teams.length === 0) {
       this.geminiClient.sendMessage(
-        `What a fantastic game! Thank you all for playing. You've been a wonderful audience!`
+        `[GAME OVER] What a game! Thank everyone for playing and wrap up with energy!`
       );
       return;
     }
 
-    // Get teams sorted by score
-    const teams = Object.entries(game.scoreboard.teams)
-      .map(([id, team]) => ({ id, name: team.name, score: team.score }))
-      .sort((a, b) => b.score - a.score);
-
-    if (teams.length === 0) {
-      return;
-    }
-
-    // Announce the winner(s)
     const winner = teams[0];
     const isTie = teams.length > 1 && teams[1].score === winner.score;
+    const tiedTeams = isTie ? teams.filter(t => t.score === winner.score) : [];
+    const marginOfVictory = teams.length > 1 ? winner.score - teams[1].score : 0;
 
-    let message = `What an incredible game! `;
+    const prompt = `[GAME OVER - FINAL RESULTS]
 
-    if (isTie) {
-      const tiedTeams = teams.filter(t => t.score === winner.score).map(t => t.name);
-      message += `We have a tie! ${tiedTeams.join(' and ')} both finish with ${winner.score} points! `;
-    } else {
-      message += `Congratulations to ${winner.name} for winning with ${winner.score} points! `;
-    }
+=== FINAL STANDINGS ===
+${this.buildScoreboardSummary(teams)}
 
-    message += `Thank you all for playing, and let's give everyone a round of applause!`;
+=== WINNER INFO ===
+${isTie
+  ? `TIE GAME! Teams tied for first: ${tiedTeams.map(t => t.name).join(' and ')} with ${winner.score} points!`
+  : `WINNER: ${winner.name} with ${winner.score} points!`}
+${!isTie && marginOfVictory > 0 ? `Margin of victory: ${marginOfVictory} points` : ''}
+${winner.players.length > 0 ? `Winning players: ${winner.players.join(', ')}` : ''}
 
-    this.geminiClient.sendMessage(message);
+=== YOUR TASK ===
+This is the BIG FINALE! Make it memorable!
+
+MUST COVER:
+- Build dramatic tension before announcing the winner
+- ${isTie
+    ? `Announce the TIE! Celebrate both/all tied teams: ${tiedTeams.map(t => t.name).join(' and ')}`
+    : `Crown the champion: ${winner.name}! Celebrate them!`}
+- Give a shoutout to ALL teams - everyone played well
+- Thank everyone for playing
+- End on a high note - this was a great game!
+
+BE SPONTANEOUS! This is your moment to shine as a host.
+Make the winners feel like champions. Make everyone feel good about playing.
+Build the drama, deliver the payoff, and close the show with style!
+Take about 30-40 seconds for this grand finale.`;
+
+    this.geminiClient.sendMessage(prompt);
   }
 
   stop(): void {
