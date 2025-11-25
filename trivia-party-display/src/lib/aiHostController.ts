@@ -5,8 +5,8 @@
  * via the Gemini Live API. Detects state transitions by comparing previous and current
  * game data, eliminating the need for a separate game_events collection.
  *
- * Prompts are designed to give Gemini the DATA and INTENT, allowing its personality
- * to drive the actual delivery for natural, varied, human-like speech.
+ * Prompts provide DATA to speak and brief guidance. The system instruction defines
+ * Terry's personality - these prompts just feed information.
  */
 
 import pb from './pocketbase';
@@ -171,7 +171,7 @@ export class AIHostController {
     const lines = teams.map((team, i) => {
       const position = i + 1;
       const playerList = team.players.length > 0
-        ? ` (players: ${team.players.join(', ')})`
+        ? ` (${team.players.join(', ')})`
         : '';
       return `${position}. ${team.name}: ${team.score} points${playerList}`;
     });
@@ -188,27 +188,22 @@ export class AIHostController {
     const hints: string[] = [];
     const leader = teams[0];
     const second = teams[1];
-    const last = teams[teams.length - 1];
     const gap = leader.score - second.score;
 
     if (gap === 0) {
       const tiedTeams = teams.filter(t => t.score === leader.score);
       if (tiedTeams.length > 2) {
-        hints.push(`${tiedTeams.length}-way tie at the top!`);
+        hints.push(`${tiedTeams.length}-way tie at the top`);
       } else {
-        hints.push(`${leader.name} and ${second.name} are tied!`);
+        hints.push(`${leader.name} and ${second.name} are tied`);
       }
     } else if (gap <= 2) {
-      hints.push(`Very close race - only ${gap} point${gap === 1 ? '' : 's'} separating the top teams.`);
+      hints.push(`Very close - only ${gap} point${gap === 1 ? '' : 's'} between top teams`);
     } else if (gap >= 10) {
-      hints.push(`${leader.name} has a commanding lead of ${gap} points.`);
+      hints.push(`${leader.name} leading by ${gap} points`);
     }
 
-    if (teams.length > 2 && last.score < leader.score - 5) {
-      hints.push(`${last.name} will need a strong comeback.`);
-    }
-
-    return hints.join(' ');
+    return hints.join('. ');
   }
 
   private handleGameStart(game: GamesRecord, gameData: GameData): void {
@@ -217,32 +212,20 @@ export class AIHostController {
 
     const teamIntros = teams.map(team => {
       if (team.players.length > 0) {
-        return `Team "${team.name}" with players: ${team.players.join(', ')}`;
+        return `- ${team.name}: ${team.players.join(', ')}`;
       }
-      return `Team "${team.name}"`;
+      return `- ${team.name}`;
     }).join('\n');
 
-    const prompt = `[GAME STARTING - WELCOME EVERYONE]
+    // Simple, direct prompt - let Terry's personality shine through
+    const prompt = `Welcome everyone to "${game.name}"!
 
-=== GAME INFO ===
-Game name: "${game.name}"
-Total rounds: ${totalRounds}
-Number of teams: ${teams.length}
+We have ${teams.length} teams competing tonight across ${totalRounds} rounds.
 
-=== TEAMS & PLAYERS ===
-${teamIntros || 'No teams registered yet'}
+Here are our teams:
+${teamIntros || 'Teams are still joining!'}
 
-=== YOUR TASK ===
-Welcome everyone to this trivia game! This is your opening - make it memorable.
-- Introduce yourself briefly (you're Terry, the host)
-- Mention the game name
-- Introduce each team by name and call out their players
-- Build excitement for the competition ahead
-- Mention how many rounds we'll be playing
-
-BE SPONTANEOUS! Vary your delivery - don't use the same phrases every time.
-Have fun with the team names. Make players feel welcomed and pumped up.
-Keep it energetic but not too long - about 20-30 seconds.`;
+Introduce yourself as Terry the host, welcome each team by name, mention their players, and get everyone excited to play!`;
 
     this.geminiClient.sendMessage(prompt);
   }
@@ -256,31 +239,27 @@ Keep it energetic but not too long - about 20-30 seconds.`;
     const isFinalRound = totalRounds ? roundNumber === totalRounds : false;
     const roundsRemaining = totalRounds ? totalRounds - roundNumber : null;
 
-    // Only show scores if not round 1
-    const scoreSection = roundNumber > 1 ? `
-=== CURRENT STANDINGS ===
+    let prompt = `Round ${roundNumber}${totalRounds ? ` of ${totalRounds}` : ''} is starting!
+
+This round has ${questionCount} questions.
+${category ? `Category: ${category}` : 'Mixed categories this round.'}`;
+
+    if (roundNumber > 1) {
+      const scoreAnalysis = this.analyzeScores(teams);
+      prompt += `
+
+Current standings:
 ${this.buildScoreboardSummary(teams)}
+${scoreAnalysis ? `\n${scoreAnalysis}.` : ''}`;
+    }
 
-Score analysis: ${this.analyzeScores(teams) || 'Everyone starting fresh!'}` : '';
+    if (isFinalRound) {
+      prompt += `\n\nThis is the FINAL ROUND!`;
+    } else if (roundsRemaining) {
+      prompt += `\n\n${roundsRemaining} round${roundsRemaining === 1 ? '' : 's'} left after this one.`;
+    }
 
-    const prompt = `[ROUND ${roundNumber} STARTING]
-
-=== ROUND INFO ===
-Round: ${roundNumber}${totalRounds ? ` of ${totalRounds}` : ''}
-Questions this round: ${questionCount}
-${category ? `Category: ${category}` : 'Category: Mixed/General'}
-${scoreSection}
-
-=== YOUR TASK ===
-Announce that Round ${roundNumber} is starting!
-${category ? `- Mention the category: "${category}"` : '- Let them know it\'s a mixed category round'}
-- Tell them how many questions are in this round
-${roundNumber > 1 ? '- Briefly acknowledge the current standings (who\'s leading, any close races)' : '- This is round 1, so everyone starts at zero - mention the fresh start'}
-${isFinalRound ? '- THIS IS THE FINAL ROUND! Build drama and tension!' : roundsRemaining ? `- Mention there ${roundsRemaining === 1 ? 'is 1 round' : `are ${roundsRemaining} rounds`} left after this one` : ''}
-
-BE SPONTANEOUS! Vary your energy and phrasing.
-${roundNumber > 1 ? 'React naturally to the scores - is it close? Is someone running away with it?' : ''}
-Keep it punchy - about 10-15 seconds.`;
+    prompt += `\n\nAnnounce the round, ${roundNumber > 1 ? 'comment on the scores,' : ''} and get everyone ready!`;
 
     this.geminiClient.sendMessage(prompt);
   }
@@ -294,45 +273,24 @@ Keep it punchy - about 10-15 seconds.`;
 
     const questionNumber = question.question_number;
     const totalQuestions = gameData.round?.question_count ?? '?';
-    const category = question.category || gameData.round?.title || 'General';
-    const difficulty = question.difficulty || 'Medium';
     const isLastQuestion = questionNumber === totalQuestions;
-    const isFirstQuestion = questionNumber === 1;
 
-    const prompt = `[QUESTION TIME]
+    // Direct format - just the question and answers to read
+    const prompt = `Question ${questionNumber} of ${totalQuestions}${isLastQuestion ? ' - last question of the round!' : ''}
 
-=== QUESTION INFO ===
-Question ${questionNumber} of ${totalQuestions}
-Category: ${category}
-Difficulty: ${difficulty}
-${isFirstQuestion ? '(First question of the round!)' : ''}
-${isLastQuestion ? '(LAST QUESTION of this round!)' : ''}
-
-=== THE QUESTION ===
 "${question.question}"
 
-=== ANSWER CHOICES ===
 A: ${question.a}
 B: ${question.b}
 C: ${question.c}
 D: ${question.d}
 
-=== YOUR TASK ===
-Present this question to the teams!
-- Read the question clearly and with good pacing
-- Read ALL FOUR answer choices (A, B, C, D) clearly
-- ${isLastQuestion ? 'Build tension - this is the last question of the round!' : ''}
-- ${isFirstQuestion ? 'Set the tone - first question, let\'s see what they\'ve got!' : ''}
-- Encourage teams to discuss and submit their answers
-
-IMPORTANT: You MUST read the full question and ALL answer choices clearly.
-Add your own flair - maybe a quick reaction to an interesting question,
-build suspense, or comment on the difficulty. Keep each delivery fresh!`;
+Read the question and all four choices clearly. Tell teams to discuss and submit their answers.`;
 
     this.geminiClient.sendMessage(prompt);
   }
 
-  private handleAnswerReveal(gameData: GameData, game: GamesRecord): void {
+  private handleAnswerReveal(gameData: GameData, _game: GamesRecord): void {
     const question = gameData.question;
     if (!question) {
       console.warn('[AIHost] Answer reveal but no question in game data');
@@ -347,30 +305,13 @@ build suspense, or comment on the difficulty. Keep each delivery fresh!`;
 
     const answerKey = correctAnswer.toLowerCase() as 'a' | 'b' | 'c' | 'd';
     const answerText = question[answerKey] || correctAnswer;
-    const teams = this.getTeamsWithPlayers(game);
 
-    const prompt = `[ANSWER REVEAL]
+    // Simple reveal with request for fun fact
+    const prompt = `The correct answer is ${correctAnswer}: "${answerText}"
 
-=== THE ANSWER ===
-Correct answer: ${correctAnswer}
-Full answer: "${answerText}"
+The question was: "${question.question}"
 
-=== THE QUESTION WAS ===
-"${question.question}"
-
-=== CURRENT SCORES ===
-${this.buildScoreboardSummary(teams)}
-
-=== YOUR TASK ===
-Reveal the correct answer!
-- Announce that the answer is ${correctAnswer}: "${answerText}"
-- React naturally - was it tricky? Surprising? A classic?
-- Share a brief interesting tidbit or fun fact related to the answer (make it educational!)
-- Keep the energy up
-
-BE SPONTANEOUS! Vary how you reveal answers - sometimes dramatic pause,
-sometimes quick reveal, sometimes playful teasing. Keep it fresh and engaging!
-About 15-20 seconds including the fun fact.`;
+Reveal the answer and share one interesting fact about it.`;
 
     this.geminiClient.sendMessage(prompt);
   }
@@ -383,40 +324,19 @@ About 15-20 seconds including the fun fact.`;
     const teams = this.getTeamsWithPlayers(game);
     const scoreAnalysis = this.analyzeScores(teams);
 
-    const roundsRemainingText = roundsRemaining !== null
-      ? (roundsRemaining === 1 ? '1 round' : `${roundsRemaining} rounds`)
-      : 'more rounds';
+    let prompt = `Round ${roundNumber} is complete!
 
-    const prompt = `[ROUND ${roundNumber} COMPLETE]
-
-=== ROUND SUMMARY ===
-Completed: Round ${roundNumber}${totalRounds ? ` of ${totalRounds}` : ''}
-${isFinalRound ? '>>> THIS WAS THE FINAL ROUND! <<<' : `Rounds remaining: ${roundsRemainingText}`}
-
-=== FULL SCOREBOARD ===
+SCOREBOARD:
 ${this.buildScoreboardSummary(teams)}
+${scoreAnalysis ? `\n${scoreAnalysis}.` : ''}`;
 
-=== SCORE ANALYSIS ===
-${scoreAnalysis || 'Scores are spread out.'}
+    if (isFinalRound) {
+      prompt += `\n\nThat was the final round! The winner is about to be announced!`;
+    } else if (roundsRemaining) {
+      prompt += `\n\n${roundsRemaining} round${roundsRemaining === 1 ? '' : 's'} to go.`;
+    }
 
-=== YOUR TASK ===
-Wrap up Round ${roundNumber} and discuss the scores!
-
-MUST COVER:
-- Announce the round is complete
-- Go through the current standings - mention EVERY team by name and their score
-- Comment on the race: Who's leading? How close is it? Any surprises?
-- ${isFinalRound
-    ? 'THIS IS IT! The game is over! Build to the final results (game end announcement comes next)'
-    : `Mention there ${roundsRemainingText === '1 round' ? 'is' : 'are'} ${roundsRemainingText} left - can trailing teams catch up?`}
-
-BE SPONTANEOUS! React genuinely to the standings.
-- If it's close, build the tension!
-- If someone's dominating, acknowledge it
-- If there's an underdog, root for the comeback
-- Use team names naturally in your commentary
-
-This is a key moment - take about 20-30 seconds to really break down the standings.`;
+    prompt += `\n\nAnnounce the round is over, read through all the scores, and comment on who's leading and how close it is.`;
 
     this.geminiClient.sendMessage(prompt);
   }
@@ -426,7 +346,7 @@ This is a key moment - take about 20-30 seconds to really break down the standin
 
     if (teams.length === 0) {
       this.geminiClient.sendMessage(
-        `[GAME OVER] What a game! Thank everyone for playing and wrap up with energy!`
+        `The game is over! Thank everyone for playing and say goodbye!`
       );
       return;
     }
@@ -434,36 +354,24 @@ This is a key moment - take about 20-30 seconds to really break down the standin
     const winner = teams[0];
     const isTie = teams.length > 1 && teams[1].score === winner.score;
     const tiedTeams = isTie ? teams.filter(t => t.score === winner.score) : [];
-    const marginOfVictory = teams.length > 1 ? winner.score - teams[1].score : 0;
 
-    const prompt = `[GAME OVER - FINAL RESULTS]
+    let prompt = `GAME OVER!
 
-=== FINAL STANDINGS ===
+FINAL SCORES:
 ${this.buildScoreboardSummary(teams)}
 
-=== WINNER INFO ===
-${isTie
-  ? `TIE GAME! Teams tied for first: ${tiedTeams.map(t => t.name).join(' and ')} with ${winner.score} points!`
-  : `WINNER: ${winner.name} with ${winner.score} points!`}
-${!isTie && marginOfVictory > 0 ? `Margin of victory: ${marginOfVictory} points` : ''}
-${winner.players.length > 0 ? `Winning players: ${winner.players.join(', ')}` : ''}
+`;
 
-=== YOUR TASK ===
-This is the BIG FINALE! Make it memorable!
+    if (isTie) {
+      prompt += `WE HAVE A TIE! ${tiedTeams.map(t => t.name).join(' and ')} tied with ${winner.score} points!`;
+    } else {
+      prompt += `THE WINNER IS: ${winner.name} with ${winner.score} points!`;
+      if (winner.players.length > 0) {
+        prompt += `\nCongratulations to ${winner.players.join(', ')}!`;
+      }
+    }
 
-MUST COVER:
-- Build dramatic tension before announcing the winner
-- ${isTie
-    ? `Announce the TIE! Celebrate both/all tied teams: ${tiedTeams.map(t => t.name).join(' and ')}`
-    : `Crown the champion: ${winner.name}! Celebrate them!`}
-- Give a shoutout to ALL teams - everyone played well
-- Thank everyone for playing
-- End on a high note - this was a great game!
-
-BE SPONTANEOUS! This is your moment to shine as a host.
-Make the winners feel like champions. Make everyone feel good about playing.
-Build the drama, deliver the payoff, and close the show with style!
-Take about 30-40 seconds for this grand finale.`;
+    prompt += `\n\nCelebrate the winner, thank all the teams for playing, and close out the show!`;
 
     this.geminiClient.sendMessage(prompt);
   }
