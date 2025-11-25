@@ -1,3 +1,5 @@
+use tauri::Manager;
+
 // Monitor commands only available on desktop platforms
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 #[tauri::command]
@@ -166,9 +168,9 @@ fn setup_desktop_menu(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Er
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  // Use conditional compilation to avoid unused_mut warning on mobile platforms
+  // Use conditional compilation for platform-specific plugins
   #[cfg(not(any(target_os = "android", target_os = "ios")))]
-  let mut builder = tauri::Builder::default()
+  let builder = tauri::Builder::default()
     .plugin(tauri_plugin_updater::Builder::new().build())
     .plugin(tauri_plugin_process::init());
 
