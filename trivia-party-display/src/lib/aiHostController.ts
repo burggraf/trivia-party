@@ -1,28 +1,34 @@
 /**
  * AI Host Controller for Trivia Party
  *
- * Subscribes to game events from PocketBase and triggers AI voice responses
- * via the Gemini Live API. Handles all game flow events for pub quiz format.
+ * Subscribes to game record changes from PocketBase and triggers AI voice responses
+ * via the Gemini Live API. Detects state transitions by comparing previous and current
+ * game data, eliminating the need for a separate game_events collection.
  */
 
 import pb from './pocketbase';
 import { GeminiLiveClient } from './geminiLiveClient';
 import type { ConnectionState } from '@/types/gemini';
+import type { GamesRecord } from '@/types/pocketbase-types';
+import type { GameData, GameState } from '@/types/games';
 
-interface GameEvent {
-  id: string;
-  game: string;
-  type: string;
-  round_number?: number;
-  question_number?: number;
-  metadata?: Record<string, any>;
-  created: string;
+interface TrackedState {
+  state: GameState | null;
+  roundNumber: number | null;
+  questionNumber: number | null;
+  answerRevealed: boolean;
 }
 
 export class AIHostController {
   private geminiClient: GeminiLiveClient;
   private unsubscribe: (() => void) | null = null;
   private isStarted: boolean = false;
+  private previousState: TrackedState = {
+    state: null,
+    roundNumber: null,
+    questionNumber: null,
+    answerRevealed: false,
+  };
 
   constructor(private gameId: string) {
     this.geminiClient = new GeminiLiveClient(gameId);
@@ -41,17 +47,15 @@ export class AIHostController {
       await this.geminiClient.connect();
       console.log('[AIHost] Connected to Gemini Live API');
 
-      // Subscribe to game events
-      this.unsubscribe = await pb.collection('game_events').subscribe('*', (e) => {
-        if (e.action === 'create' && e.record.game === this.gameId) {
-          this.handleGameEvent(e.record as unknown as GameEvent);
+      // Subscribe to game record changes (same pattern as display UI)
+      this.unsubscribe = await pb.collection('games').subscribe<GamesRecord>(this.gameId, (e) => {
+        if (e.action === 'update') {
+          this.handleGameUpdate(e.record);
         }
-      }, {
-        filter: `game = "${this.gameId}"`
       });
 
       this.isStarted = true;
-      console.log('[AIHost] Successfully started and subscribed to game events');
+      console.log('[AIHost] Successfully started and subscribed to game updates');
 
     } catch (error) {
       console.error('[AIHost] Failed to start:', error);
@@ -59,53 +63,80 @@ export class AIHostController {
     }
   }
 
-  private async handleGameEvent(event: GameEvent): Promise<void> {
-    console.log('[AIHost] Handling event:', event.type, event);
+  private handleGameUpdate(game: GamesRecord): void {
+    const gameData = typeof game.data === 'string' ? JSON.parse(game.data) : game.data as GameData | undefined;
 
-    try {
-      switch (event.type) {
-        case 'game_start':
-          await this.handleGameStart(event);
-          break;
+    if (!gameData?.state) {
+      return;
+    }
 
-        case 'round_start':
-          await this.handleRoundStart(event);
-          break;
+    const currentState: TrackedState = {
+      state: gameData.state,
+      roundNumber: gameData.round?.round_number ?? null,
+      questionNumber: gameData.question?.question_number ?? null,
+      answerRevealed: !!gameData.question?.correct_answer,
+    };
 
-        case 'question_start':
-          await this.handleQuestionStart(event);
-          break;
+    console.log('[AIHost] Game update:', {
+      previous: this.previousState,
+      current: currentState,
+    });
 
-        case 'question_end':
-          await this.handleQuestionEnd(event);
-          break;
+    // Detect and handle state transitions
+    this.detectAndHandleTransitions(game, gameData, currentState);
 
-        case 'answer_reveal':
-          await this.handleAnswerReveal(event);
-          break;
+    // Update tracked state
+    this.previousState = currentState;
+  }
 
-        case 'scores_update':
-          await this.handleScoresUpdate(event);
-          break;
+  private detectAndHandleTransitions(
+    game: GamesRecord,
+    gameData: GameData,
+    current: TrackedState
+  ): void {
+    const prev = this.previousState;
 
-        case 'round_end':
-          await this.handleRoundEnd(event);
-          break;
+    // Game start: state changed to round-start from game-start (or first time seeing round-start)
+    if (current.state === 'round-start' && prev.state === 'game-start') {
+      this.handleGameStart(game);
+    }
 
-        case 'game_end':
-          await this.handleGameEnd(event);
-          break;
+    // Round start: entering round-start state (new round)
+    if (current.state === 'round-start' && prev.state !== 'round-start') {
+      this.handleRoundStart(gameData);
+    }
 
-        default:
-          console.warn('[AIHost] Unknown event type:', event.type);
-      }
-    } catch (error) {
-      console.error('[AIHost] Error handling event:', error);
+    // Question start: new question in round-play
+    if (
+      current.state === 'round-play' &&
+      current.questionNumber !== null &&
+      !current.answerRevealed &&
+      (prev.questionNumber !== current.questionNumber || prev.state !== 'round-play')
+    ) {
+      this.handleQuestionStart(gameData);
+    }
+
+    // Answer reveal: correct_answer just appeared
+    if (
+      current.state === 'round-play' &&
+      current.answerRevealed &&
+      !prev.answerRevealed
+    ) {
+      this.handleAnswerReveal(gameData, game);
+    }
+
+    // Round end: entering round-end state
+    if (current.state === 'round-end' && prev.state !== 'round-end') {
+      this.handleRoundEnd(gameData);
+    }
+
+    // Game end: entering game-end state
+    if (current.state === 'game-end' && prev.state !== 'game-end') {
+      this.handleGameEnd(game);
     }
   }
 
-  private async handleGameStart(_event: GameEvent): Promise<void> {
-    const game = await pb.collection('games').getOne(this.gameId);
+  private handleGameStart(game: GamesRecord): void {
     const teamCount = game.scoreboard?.teams ? Object.keys(game.scoreboard.teams).length : 0;
 
     this.geminiClient.sendMessage(
@@ -114,32 +145,30 @@ export class AIHostController {
     );
   }
 
-  private async handleRoundStart(event: GameEvent): Promise<void> {
-    const game = await pb.collection('games').getOne(this.gameId);
-    const gameData = typeof game.data === 'string' ? JSON.parse(game.data) : game.data;
-    const totalRounds = gameData?.round?.rounds || '?';
+  private handleRoundStart(gameData: GameData): void {
+    const roundNumber = gameData.round?.round_number ?? '?';
+    const totalRounds = gameData.round?.rounds ?? '?';
+    const category = gameData.round?.title || gameData.round?.categories?.[0];
 
-    this.geminiClient.sendMessage(
-      `Alright folks, here comes Round ${event.round_number} of ${totalRounds}! ` +
-      `Get your thinking caps on and let's see what questions we have in store.`
-    );
+    let message = `Alright folks, here comes Round ${roundNumber} of ${totalRounds}! `;
+    if (category) {
+      message += `This round's category is: ${category}. `;
+    }
+    message += `Get your thinking caps on and let's see what questions we have in store.`;
+
+    this.geminiClient.sendMessage(message);
   }
 
-  private async handleQuestionStart(event: GameEvent): Promise<void> {
-    // Fetch the current game state to get question details
-    const game = await pb.collection('games').getOne(this.gameId);
-    const gameData = typeof game.data === 'string' ? JSON.parse(game.data) : game.data;
-
-    if (!gameData?.question) {
-      console.warn('[AIHost] Question start event but no question in game data');
+  private handleQuestionStart(gameData: GameData): void {
+    const question = gameData.question;
+    if (!question) {
+      console.warn('[AIHost] Question start but no question in game data');
       return;
     }
 
-    const question = gameData.question;
-    const questionNumber = event.question_number || question.question_number;
-    const totalQuestions = gameData.round?.question_count || '?';
+    const questionNumber = question.question_number;
+    const totalQuestions = gameData.round?.question_count ?? '?';
 
-    // Build the question prompt with answers
     const prompt = `Here's question ${questionNumber} of ${totalQuestions}:
 
 ${question.question}
@@ -155,88 +184,73 @@ Take your time everyone, discuss with your team, and submit your answers!`;
     this.geminiClient.sendMessage(prompt);
   }
 
-  private async handleQuestionEnd(_event: GameEvent): Promise<void> {
-    this.geminiClient.sendMessage(
-      `Alright, time's up! I hope everyone got their answers in. Let's see how you all did.`
-    );
-  }
-
-  private async handleAnswerReveal(event: GameEvent): Promise<void> {
-    // Fetch the current game state to get the correct answer
-    const game = await pb.collection('games').getOne(this.gameId);
-    const gameData = typeof game.data === 'string' ? JSON.parse(game.data) : game.data;
-
-    if (!gameData?.question) {
-      console.warn('[AIHost] Answer reveal event but no question in game data');
+  private handleAnswerReveal(gameData: GameData, game: GamesRecord): void {
+    const question = gameData.question;
+    if (!question) {
+      console.warn('[AIHost] Answer reveal but no question in game data');
       return;
     }
 
-    const question = gameData.question;
     const correctAnswer = question.correct_answer;
-
     if (!correctAnswer) {
       console.warn('[AIHost] No correct answer in question data');
       return;
     }
 
     // Get the full answer text
-    const answerText = question[correctAnswer.toLowerCase()] || correctAnswer;
+    const answerKey = correctAnswer.toLowerCase() as 'a' | 'b' | 'c' | 'd';
+    const answerText = question[answerKey] || correctAnswer;
 
-    // Check if there's a fun fact or additional info in metadata
-    const funFact = event.metadata?.fun_fact;
+    // Build context about team performance for this question
+    const teamResults = this.getTeamResultsSummary(game);
 
-    let message = `The correct answer is: ${correctAnswer}. ${answerText}!`;
+    // Request fun fact generation on-the-fly
+    const prompt = `The correct answer is ${correctAnswer}: ${answerText}!
 
-    if (funFact) {
-      message += ` Here's an interesting fact: ${funFact}`;
-    }
+${teamResults}
 
-    this.geminiClient.sendMessage(message);
+Please share a brief interesting fact related to this question or answer. Keep it concise and engaging.
+
+Question was: ${question.question}`;
+
+    this.geminiClient.sendMessage(prompt);
   }
 
-  private async handleScoresUpdate(_event: GameEvent): Promise<void> {
-    // Fetch current scoreboard
-    const game = await pb.collection('games').getOne(this.gameId);
-
+  private getTeamResultsSummary(game: GamesRecord): string {
     if (!game.scoreboard?.teams) {
-      return;
+      return '';
     }
 
-    // Get team scores sorted by score
-    const teams = Object.entries(game.scoreboard.teams)
-      .map(([id, team]: [string, any]) => ({ id, name: team.name, score: team.score }))
-      .sort((a, b) => b.score - a.score);
-
+    const teams = Object.values(game.scoreboard.teams);
     if (teams.length === 0) {
-      return;
+      return '';
     }
 
-    // Announce the leader
-    const leader = teams[0];
-    const message = teams.length === 1
-      ? `${leader.name} has ${leader.score} points!`
-      : `${leader.name} is in the lead with ${leader.score} points!`;
+    // Get leader info
+    const sortedTeams = [...teams].sort((a, b) => b.score - a.score);
+    const leader = sortedTeams[0];
 
-    this.geminiClient.sendMessage(message);
+    if (sortedTeams.length === 1) {
+      return `${leader.name} has ${leader.score} points.`;
+    }
+
+    return `${leader.name} is currently leading with ${leader.score} points.`;
   }
 
-  private async handleRoundEnd(event: GameEvent): Promise<void> {
-    const game = await pb.collection('games').getOne(this.gameId);
-    const gameData = typeof game.data === 'string' ? JSON.parse(game.data) : game.data;
-    const totalRounds = gameData?.round?.rounds || '?';
+  private handleRoundEnd(gameData: GameData): void {
+    const roundNumber = gameData.round?.round_number ?? '?';
+    const totalRounds = gameData.round?.rounds ?? '?';
+    const isFinalRound = roundNumber === totalRounds;
 
     this.geminiClient.sendMessage(
-      `And that's the end of Round ${event.round_number}! ` +
-      (event.round_number === totalRounds
+      `And that's the end of Round ${roundNumber}! ` +
+      (isFinalRound
         ? `What a great final round! Let's see the final scores.`
         : `Great job everyone! Let's see the current standings before we move on.`)
     );
   }
 
-  private async handleGameEnd(_event: GameEvent): Promise<void> {
-    // Fetch final scoreboard
-    const game = await pb.collection('games').getOne(this.gameId);
-
+  private handleGameEnd(game: GamesRecord): void {
     if (!game.scoreboard?.teams) {
       this.geminiClient.sendMessage(
         `What a fantastic game! Thank you all for playing. You've been a wonderful audience!`
@@ -246,7 +260,7 @@ Take your time everyone, discuss with your team, and submit your answers!`;
 
     // Get teams sorted by score
     const teams = Object.entries(game.scoreboard.teams)
-      .map(([id, team]: [string, any]) => ({ id, name: team.name, score: team.score }))
+      .map(([id, team]) => ({ id, name: team.name, score: team.score }))
       .sort((a, b) => b.score - a.score);
 
     if (teams.length === 0) {
@@ -255,11 +269,11 @@ Take your time everyone, discuss with your team, and submit your answers!`;
 
     // Announce the winner(s)
     const winner = teams[0];
-    const istie = teams.length > 1 && teams[1].score === winner.score;
+    const isTie = teams.length > 1 && teams[1].score === winner.score;
 
     let message = `What an incredible game! `;
 
-    if (istie) {
+    if (isTie) {
       const tiedTeams = teams.filter(t => t.score === winner.score).map(t => t.name);
       message += `We have a tie! ${tiedTeams.join(' and ')} both finish with ${winner.score} points! `;
     } else {
@@ -277,6 +291,12 @@ Take your time everyone, discuss with your team, and submit your answers!`;
     this.unsubscribe = null;
     this.geminiClient.disconnect();
     this.isStarted = false;
+    this.previousState = {
+      state: null,
+      roundNumber: null,
+      questionNumber: null,
+      answerRevealed: false,
+    };
   }
 
   getConnectionState(): ConnectionState {
