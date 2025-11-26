@@ -28,14 +28,10 @@ export const VOICE_OPTIONS: VoiceOption[] = [
 ]
 
 export const PERSONALITY_OPTIONS: PersonalityOption[] = [
-  { id: 'classic', name: 'Classic', description: 'Warm, professional, balanced energy' },
-  { id: 'enthusiastic', name: 'Enthusiastic', description: 'Over-the-top excited, cheerleader energy' },
-  { id: 'sarcastic', name: 'Sarcastic', description: 'Dry wit, playful teasing' },
-  { id: 'chill', name: 'Chill', description: 'Laid-back, relaxed, understated' },
-  { id: 'dramatic', name: 'Dramatic', description: 'Theater energy, big reveals' },
-  { id: 'witty', name: 'Witty', description: 'Quick jokes, clever wordplay' },
-  { id: 'encouraging', name: 'Encouraging', description: 'Super supportive, coach energy' },
-  { id: 'deadpan', name: 'Deadpan', description: 'Dry delivery, subtle humor' },
+  { id: 'classic', name: 'Classic', description: 'Warm, professional game show host' },
+  { id: 'hype', name: 'Hype', description: 'Maximum energy, everything is AMAZING' },
+  { id: 'dry', name: 'Dry', description: 'Flat, deadpan, almost bored delivery' },
+  { id: 'roast', name: 'Roast', description: 'Playful teasing, mock disappointment' },
 ]
 
 interface VoiceAccordionProps {
