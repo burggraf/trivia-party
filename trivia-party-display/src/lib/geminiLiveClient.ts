@@ -58,6 +58,8 @@ export class GeminiLiveClient {
   private audioQueue: AudioBuffer[] = [];
   private isPlaying: boolean = false;
   private nextPlayTime: number = 0; // Scheduled playback time
+  private activeSources: AudioBufferSourceNode[] = []; // Track for interruption
+  private monitorInterval: ReturnType<typeof setInterval> | null = null;
   private state: ConnectionState = 'disconnected';
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 3;
@@ -331,14 +333,54 @@ Remember: Family-friendly language, respectful to all teams. Speak naturally - n
     source.buffer = buffer;
     source.connect(this.audioContext.destination);
 
+    // Track source for potential interruption
+    this.activeSources.push(source);
+    source.onended = () => {
+      const index = this.activeSources.indexOf(source);
+      if (index > -1) {
+        this.activeSources.splice(index, 1);
+      }
+    };
+
     // Schedule at exact time for gapless playback
     source.start(this.nextPlayTime);
     this.nextPlayTime += buffer.duration;
   }
 
+  /**
+   * Stop all current audio playback immediately
+   */
+  private stopPlayback(): void {
+    // Stop all active audio sources
+    for (const source of this.activeSources) {
+      try {
+        source.stop();
+      } catch {
+        // Source may have already ended
+      }
+    }
+    this.activeSources = [];
+
+    // Clear the queue and monitoring
+    this.audioQueue = [];
+    if (this.monitorInterval) {
+      clearInterval(this.monitorInterval);
+      this.monitorInterval = null;
+    }
+
+    // Reset timing
+    this.isPlaying = false;
+    this.nextPlayTime = 0;
+  }
+
   private monitorPlayback(): void {
+    // Clear any existing monitor
+    if (this.monitorInterval) {
+      clearInterval(this.monitorInterval);
+    }
+
     // Check periodically if playback is complete and no new buffers
-    const checkInterval = setInterval(() => {
+    this.monitorInterval = setInterval(() => {
       // Process any new buffers that arrived
       while (this.audioQueue.length > 0) {
         const buffer = this.audioQueue.shift()!;
@@ -348,7 +390,10 @@ Remember: Family-friendly language, respectful to all teams. Speak naturally - n
       // Check if all scheduled audio has finished
       const now = this.audioContext.currentTime;
       if (now >= this.nextPlayTime && this.audioQueue.length === 0) {
-        clearInterval(checkInterval);
+        if (this.monitorInterval) {
+          clearInterval(this.monitorInterval);
+          this.monitorInterval = null;
+        }
         this.isPlaying = false;
         this.setState('connected');
       }
@@ -359,6 +404,12 @@ Remember: Family-friendly language, respectful to all teams. Speak naturally - n
     if (this.ws?.readyState !== WebSocket.OPEN) {
       console.warn('[GeminiLive] Cannot send message, not connected');
       return;
+    }
+
+    // Stop any current playback before sending new message
+    if (this.isPlaying) {
+      console.log('[GeminiLive] Interrupting current playback for new message');
+      this.stopPlayback();
     }
 
     const message: GeminiClientContentMessage = {
@@ -389,11 +440,9 @@ Remember: Family-friendly language, respectful to all teams. Speak naturally - n
 
   disconnect(): void {
     console.log('[GeminiLive] Disconnecting...');
+    this.stopPlayback();
     this.ws?.close();
     this.ws = null;
-    this.audioQueue = [];
-    this.isPlaying = false;
-    this.nextPlayTime = 0;
     this.setState('disconnected');
   }
 }
