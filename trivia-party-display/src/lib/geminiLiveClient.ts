@@ -138,6 +138,11 @@ Remember: Family-friendly language, respectful to all teams. Speak naturally - n
       this.ws.onopen = () => {
         console.log('[GeminiLive] WebSocket opened');
 
+        // Pre-warm AudioContext so it's ready for instant playback
+        if (this.audioContext.state === 'suspended') {
+          this.audioContext.resume();
+        }
+
         // Setup session (no auth token needed, it's in URL)
         this.setupSession();
 
@@ -299,25 +304,22 @@ Remember: Family-friendly language, respectful to all teams. Speak naturally - n
     }
   }
 
-  private async playQueue(): Promise<void> {
+  private playQueue(): void {
     if (this.isPlaying || this.audioQueue.length === 0) {
       return;
     }
 
-    // Resume AudioContext if suspended (browsers require user interaction)
+    // Resume AudioContext if suspended (don't await - let it happen in background)
     if (this.audioContext.state === 'suspended') {
       console.log('[GeminiLive] Resuming suspended AudioContext...');
-      await this.audioContext.resume();
+      this.audioContext.resume();
     }
 
     this.isPlaying = true;
 
     // Use scheduled playback for gapless audio
-    // Initialize nextPlayTime if this is a fresh start
-    const now = this.audioContext.currentTime;
-    if (this.nextPlayTime < now) {
-      this.nextPlayTime = now;
-    }
+    // Start immediately - use current time
+    this.nextPlayTime = this.audioContext.currentTime;
 
     while (this.audioQueue.length > 0) {
       const buffer = this.audioQueue.shift()!;
