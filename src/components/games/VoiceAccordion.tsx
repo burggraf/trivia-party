@@ -5,20 +5,20 @@ import { AccordionContent, AccordionItem, AccordionTrigger } from '@/components/
 import { Volume2, Square } from 'lucide-react'
 
 export interface VoiceOption {
-  id: string
-  name: string
+  id: string        // Gemini API voice ID
+  name: string      // Display name
   description: string
 }
 
 export const VOICE_OPTIONS: VoiceOption[] = [
-  { id: 'Puck', name: 'Puck', description: 'Friendly, conversational' },
-  { id: 'Charon', name: 'Charon', description: 'Deep, authoritative' },
-  { id: 'Kore', name: 'Kore', description: 'Neutral, professional' },
-  { id: 'Fenrir', name: 'Fenrir', description: 'Warm, approachable' },
-  { id: 'Aoede', name: 'Aoede', description: 'Bright, energetic' },
-  { id: 'Leda', name: 'Leda', description: 'Calm, measured' },
-  { id: 'Orus', name: 'Orus', description: 'Bold, commanding' },
-  { id: 'Zephyr', name: 'Zephyr', description: 'Light, airy' },
+  { id: 'Puck', name: 'Ethan', description: 'Friendly, conversational' },
+  { id: 'Charon', name: 'Logan', description: 'Deep, authoritative' },
+  { id: 'Kore', name: 'Ryan', description: 'Neutral, professional' },
+  { id: 'Fenrir', name: 'Noah', description: 'Warm, approachable' },
+  { id: 'Aoede', name: 'Olivia', description: 'Bright, energetic' },
+  { id: 'Leda', name: 'Sophia', description: 'Calm, measured' },
+  { id: 'Orus', name: 'Liam', description: 'Bold, commanding' },
+  { id: 'Zephyr', name: 'Mia', description: 'Light, airy' },
 ]
 
 interface VoiceAccordionProps {
@@ -43,8 +43,10 @@ export default function VoiceAccordion({ selectedVoice, onVoiceChange }: VoiceAc
       return
     }
 
-    // Play new voice sample
-    const audio = new Audio(`/voices/${voiceId.toLowerCase()}.mp3`)
+    // Play new voice sample - use display name for file
+    const voice = VOICE_OPTIONS.find(v => v.id === voiceId)
+    const fileName = voice?.name.toLowerCase() || voiceId.toLowerCase()
+    const audio = new Audio(`/voices/${fileName}.mp3`)
     audioRef.current = audio
 
     audio.onended = () => {
