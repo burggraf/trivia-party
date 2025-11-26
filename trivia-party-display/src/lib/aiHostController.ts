@@ -39,8 +39,8 @@ export class AIHostController {
     answerRevealed: false,
   };
 
-  constructor(private gameId: string, voiceName: string = 'Kore') {
-    this.geminiClient = new GeminiLiveClient(gameId, voiceName);
+  constructor(private gameId: string, voiceName: string = 'Kore', personality: string = 'classic') {
+    this.geminiClient = new GeminiLiveClient(gameId, voiceName, personality);
   }
 
   async start(): Promise<void> {

@@ -18,13 +18,15 @@ export function GameDisplay() {
   const gameData = gameRecord?.data as GameData | undefined
 
   // Initialize AI Host Controller when game starts
-  // Get voice from game metadata (default to 'Kore' if not set)
-  const voiceName = (gameRecord?.metadata as { ai_voice?: string } | undefined)?.ai_voice || 'Kore'
+  // Get voice and personality from game metadata (with defaults)
+  const metadata = gameRecord?.metadata as { ai_voice?: string; ai_personality?: string } | undefined
+  const voiceName = metadata?.ai_voice || 'Kore'
+  const personality = metadata?.ai_personality || 'classic'
 
   React.useEffect(() => {
     if (!gameRecord?.id) return
 
-    const aiHost = new AIHostController(gameRecord.id, voiceName)
+    const aiHost = new AIHostController(gameRecord.id, voiceName, personality)
     aiHostRef.current = aiHost
 
     // Start the AI host (connects to Gemini and subscribes to events)
@@ -35,7 +37,7 @@ export function GameDisplay() {
     return () => {
       aiHost.stop()
     }
-  }, [gameRecord?.id, voiceName])
+  }, [gameRecord?.id, voiceName, personality])
 
   // Update timer display every second
   React.useEffect(() => {
