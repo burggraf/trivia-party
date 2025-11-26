@@ -13,7 +13,7 @@ export interface VoiceOption {
 export const VOICE_OPTIONS: VoiceOption[] = [
   { id: 'Puck', name: 'Ethan', description: 'Friendly, conversational' },
   { id: 'Charon', name: 'Logan', description: 'Deep, authoritative' },
-  { id: 'Kore', name: 'Ryan', description: 'Neutral, professional' },
+  { id: 'Kore', name: 'Ava', description: 'Neutral, professional' },
   { id: 'Fenrir', name: 'Noah', description: 'Warm, approachable' },
   { id: 'Aoede', name: 'Olivia', description: 'Bright, energetic' },
   { id: 'Leda', name: 'Sophia', description: 'Calm, measured' },

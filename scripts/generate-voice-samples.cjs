@@ -14,7 +14,7 @@ const { execSync } = require('child_process');
 const VOICES = [
   { id: 'Puck', name: 'ethan' },
   { id: 'Charon', name: 'logan' },
-  { id: 'Kore', name: 'ryan' },
+  { id: 'Kore', name: 'ava' },
   { id: 'Fenrir', name: 'noah' },
   { id: 'Aoede', name: 'olivia' },
   { id: 'Leda', name: 'sophia' },
