@@ -9,6 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const { execSync } = require('child_process');
 
 const VOICES = [
   { id: 'Puck', name: 'ethan' },
@@ -72,12 +73,23 @@ async function generateVoiceSample(voiceId, fileName, apiKey) {
             return;
           }
 
-          // Decode base64 audio and save
+          // Decode base64 audio (raw PCM 24kHz mono 16-bit signed LE)
           const audioData = Buffer.from(audioPart.inlineData.data, 'base64');
+          const rawPath = path.join(OUTPUT_DIR, `${fileName}.raw`);
           const outputPath = path.join(OUTPUT_DIR, `${fileName}.mp3`);
 
-          fs.writeFileSync(outputPath, audioData);
-          console.log(`✓ Generated ${fileName}.mp3 (${voiceId})`);
+          // Save raw PCM first
+          fs.writeFileSync(rawPath, audioData);
+
+          // Convert to MP3 using ffmpeg
+          try {
+            execSync(`ffmpeg -y -f s16le -ar 24000 -ac 1 -i "${rawPath}" -codec:a libmp3lame -qscale:a 2 "${outputPath}"`, { stdio: 'pipe' });
+            fs.unlinkSync(rawPath); // Remove raw file
+            console.log(`✓ Generated ${fileName}.mp3 (${voiceId})`);
+          } catch (ffmpegErr) {
+            console.error(`✗ ffmpeg conversion failed for ${fileName}: ${ffmpegErr.message}`);
+            fs.unlinkSync(rawPath);
+          }
           resolve();
         } catch (err) {
           reject(err);
