@@ -314,7 +314,7 @@ export default function RoundPlayDisplay({ gameData, mode = 'controller', onAnsw
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {Object.entries(scoreboard.teams)
-                .filter(([teamId]) => teamId !== 'no-team') // Exclude "No Team"
+                .filter(([, teamData]) => teamData.players.length > 0) // Exclude empty teams
                 .sort(([, a], [, b]) => (b.score || 0) - (a.score || 0)) // Sort by score descending
                 .map(([teamId, teamData]) => {
                   const teamStatus = teamAnswerStatus.get(teamId)

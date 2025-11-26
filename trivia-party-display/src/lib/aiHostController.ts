@@ -159,6 +159,7 @@ export class AIHostController {
         score: team.score,
         players: team.players?.map(p => p.name).filter(Boolean) || [],
       }))
+      .filter(team => team.players.length > 0) // Ignore teams with no players
       .sort((a, b) => b.score - a.score);
   }
 

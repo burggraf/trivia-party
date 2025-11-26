@@ -21,7 +21,7 @@ export default function RoundEnd({ gameData, scoreboard }: RoundEndProps) {
   // Get teams sorted by score
   const sortedTeams = scoreboard
     ? Object.entries(scoreboard.teams)
-        .filter(([teamId, teamData]) => teamId !== 'no-team' && teamData.players.length > 0)
+        .filter(([, teamData]) => teamData.players.length > 0)
         .sort(([, a], [, b]) => (b.score || 0) - (a.score || 0))
         .map(([teamId, teamData]) => ({ id: teamId, ...teamData }))
     : []

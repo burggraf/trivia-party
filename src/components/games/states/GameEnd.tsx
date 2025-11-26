@@ -28,7 +28,7 @@ export default function GameEnd({ scoreboard }: GameEndProps) {
         {scoreboard && Object.keys(scoreboard.teams).length > 0 ? (
           <div className="space-y-4">
             {Object.entries(scoreboard.teams)
-              .filter(([teamId, teamData]) => teamId !== 'no-team' && teamData.players.length > 0)
+              .filter(([, teamData]) => teamData.players.length > 0)
               .sort(([, a], [, b]) => (b.score || 0) - (a.score || 0))
               .map(([teamId, teamData]: [string, ScoreboardTeam], index) => (
               <div

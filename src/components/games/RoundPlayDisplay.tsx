@@ -360,8 +360,7 @@ export default function RoundPlayDisplay({ gameData, mode = 'controller', onAnsw
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {Object.entries(scoreboard.teams)
-                .filter(([teamId, teamData]) => {
-                  if (teamId === 'no-team') return false // Exclude "No Team"
+                .filter(([, teamData]) => {
                   if (!showEmptyTeams && teamData.players.length === 0) return false // Exclude empty teams if toggle is off
                   return true
                 })

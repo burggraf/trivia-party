@@ -171,12 +171,7 @@ export default function ControllerPage() {
 
     try {
       // Start with empty teams structure
-      const teams: Record<string, { name: string; players: Array<{ id: string; gamePlayerId?: string; name: string; avatar: string }> }> = {
-        'no-team': {
-          name: 'No Team',
-          players: []
-        }
-      }
+      const teams: Record<string, { name: string; players: Array<{ id: string; gamePlayerId?: string; name: string; avatar: string }> }> = {}
 
       // Get all teams for this game
       try {
@@ -219,7 +214,13 @@ export default function ControllerPage() {
         // Assign players to teams using name/avatar from game_players record
         for (const player of Object.values(uniquePlayers)) {
           const playerRef = player.player
-          const assignedTeamId = player.team || 'no-team'
+          const assignedTeamId = player.team
+
+          // Skip players without a team assignment
+          if (!assignedTeamId) {
+            console.log('Skipping player', player.name || playerRef, '- no team assigned')
+            continue
+          }
 
           // Get player details directly from game_players record
           const playerInfo = {
@@ -231,10 +232,10 @@ export default function ControllerPage() {
 
           console.log('Added player', playerInfo.name || playerRef, 'to team', assignedTeamId)
 
-          // Ensure the team exists
+          // Ensure the team exists (handle edge case of deleted team)
           if (!teams[assignedTeamId]) {
             teams[assignedTeamId] = {
-              name: assignedTeamId === 'no-team' ? 'No Team' : 'Unknown Team',
+              name: 'Unknown Team',
               players: []
             }
           }
