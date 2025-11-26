@@ -133,57 +133,62 @@ Remember: Family-friendly language, respectful to all teams. Speak naturally - n
       // Step 2: Connect to Gemini Live API with API key in URL
       const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${tokenData.access_token}`;
 
-      this.ws = new WebSocket(wsUrl);
+      // Wait for WebSocket to actually open before resolving
+      await new Promise<void>((resolve, reject) => {
+        this.ws = new WebSocket(wsUrl);
 
-      // Add token as first message after connection
-      this.ws.onopen = () => {
-        console.log('[GeminiLive] WebSocket opened');
+        this.ws.onopen = () => {
+          console.log('[GeminiLive] WebSocket opened');
 
-        // Pre-warm AudioContext so it's ready for instant playback
-        if (this.audioContext.state === 'suspended') {
-          this.audioContext.resume();
-        }
+          // Pre-warm AudioContext so it's ready for instant playback
+          if (this.audioContext.state === 'suspended') {
+            this.audioContext.resume();
+          }
 
-        // Setup session (no auth token needed, it's in URL)
-        this.setupSession();
+          // Setup session (no auth token needed, it's in URL)
+          this.setupSession();
 
-        // Mark as connected immediately - Gemini may not send setupComplete
-        this.setState('connected');
-        this.reconnectAttempts = 0;
-      };
+          // Mark as connected immediately - Gemini may not send setupComplete
+          this.setState('connected');
+          this.reconnectAttempts = 0;
 
-      this.ws.onmessage = async (event) => {
-        let data = event.data;
+          resolve();
+        };
 
-        // Handle different data types
-        if (data instanceof Blob) {
-          data = await data.text();
-        } else if (data instanceof ArrayBuffer) {
-          data = new TextDecoder().decode(data);
-        } else if (typeof data !== 'string') {
-          data = String(data);
-        }
+        this.ws.onmessage = async (event) => {
+          let data = event.data;
 
-        this.handleMessage(data);
-      };
+          // Handle different data types
+          if (data instanceof Blob) {
+            data = await data.text();
+          } else if (data instanceof ArrayBuffer) {
+            data = new TextDecoder().decode(data);
+          } else if (typeof data !== 'string') {
+            data = String(data);
+          }
 
-      this.ws.onerror = (event) => {
-        console.error('[GeminiLive] WebSocket error:', event);
-        this.setState('error');
-        this.onError?.(new Error('WebSocket error'));
-      };
+          this.handleMessage(data);
+        };
 
-      this.ws.onclose = (event) => {
-        console.log('[GeminiLive] WebSocket closed:', event.code, event.reason);
-        this.setState('disconnected');
+        this.ws.onerror = (event) => {
+          console.error('[GeminiLive] WebSocket error:', event);
+          this.setState('error');
+          this.onError?.(new Error('WebSocket error'));
+          reject(new Error('WebSocket error'));
+        };
 
-        // Attempt reconnection
-        if (this.reconnectAttempts < this.maxReconnectAttempts) {
-          this.reconnectAttempts++;
-          console.log(`[GeminiLive] Reconnecting (attempt ${this.reconnectAttempts})...`);
-          setTimeout(() => this.connect(), 2000);
-        }
-      };
+        this.ws.onclose = (event) => {
+          console.log('[GeminiLive] WebSocket closed:', event.code, event.reason);
+          this.setState('disconnected');
+
+          // Only attempt auto-reconnection if not manually closed
+          if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
+            this.reconnectAttempts++;
+            console.log(`[GeminiLive] Reconnecting (attempt ${this.reconnectAttempts})...`);
+            setTimeout(() => this.connect(), 2000);
+          }
+        };
+      });
 
     } catch (error) {
       console.error('[GeminiLive] Connection error:', error);
