@@ -30,7 +30,7 @@ export default function GeminiLiveTest() {
 
   const handleTestMessage = () => {
     if (clientRef.current) {
-      clientRef.current.sendMessage('Say hello and introduce yourself as Terry, the trivia host!');
+      clientRef.current.sendMessage('Say hello and introduce yourself as the trivia host!');
     }
   };
 

@@ -6,7 +6,7 @@
  * game data, eliminating the need for a separate game_events collection.
  *
  * Prompts provide DATA to speak and brief guidance. The system instruction defines
- * Terry's personality - these prompts just feed information.
+ * the host's personality - these prompts just feed information.
  */
 
 import pb from './pocketbase';
@@ -14,6 +14,18 @@ import { GeminiLiveClient } from './geminiLiveClient';
 import type { ConnectionState } from '@/types/gemini';
 import type { GamesRecord } from '@/types/pocketbase-types';
 import type { GameData, GameState, ScoreboardTeam } from '@/types/games';
+
+// Map voice IDs to display names
+const VOICE_DISPLAY_NAMES: Record<string, string> = {
+  'Puck': 'Ethan',
+  'Charon': 'Logan',
+  'Kore': 'Ava',
+  'Fenrir': 'Noah',
+  'Aoede': 'Olivia',
+  'Leda': 'Sophia',
+  'Orus': 'Liam',
+  'Zephyr': 'Mia',
+};
 
 interface TrackedState {
   state: GameState | null;
@@ -32,6 +44,7 @@ export class AIHostController {
   private geminiClient: GeminiLiveClient;
   private unsubscribe: (() => void) | null = null;
   private isStarted: boolean = false;
+  private hostName: string;
   private previousState: TrackedState = {
     state: null,
     roundNumber: null,
@@ -40,7 +53,8 @@ export class AIHostController {
   };
 
   constructor(private gameId: string, voiceName: string = 'Kore', personality: string = 'classic') {
-    this.geminiClient = new GeminiLiveClient(gameId, voiceName, personality);
+    this.hostName = VOICE_DISPLAY_NAMES[voiceName] || 'Ava';
+    this.geminiClient = new GeminiLiveClient(gameId, voiceName, personality, this.hostName);
   }
 
   async start(): Promise<void> {
@@ -218,7 +232,7 @@ export class AIHostController {
       return `- ${team.name}`;
     }).join('\n');
 
-    // Simple, direct prompt - let Terry's personality shine through
+    // Simple, direct prompt - let the host's personality shine through
     const prompt = `Welcome everyone to "${game.name}"!
 
 We have ${teams.length} teams competing tonight across ${totalRounds} rounds.
@@ -226,7 +240,7 @@ We have ${teams.length} teams competing tonight across ${totalRounds} rounds.
 Here are our teams:
 ${teamIntros || 'Teams are still joining!'}
 
-Introduce yourself as Terry the host, welcome each team by name, mention their players, and get everyone excited to play!`;
+Introduce yourself as ${this.hostName} the host, welcome each team by name, mention their players, and get everyone excited to play!`;
 
     this.geminiClient.sendMessage(prompt);
   }

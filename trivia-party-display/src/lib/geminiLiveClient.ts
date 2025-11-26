@@ -69,7 +69,8 @@ export class GeminiLiveClient {
   constructor(
     private gameId: string,
     private voiceName: string = 'Kore',
-    private personality: string = 'classic'
+    private personality: string = 'classic',
+    private hostName: string = 'Ava'
   ) {
     this.audioContext = new AudioContext({ sampleRate: 24000 });
   }
@@ -77,7 +78,7 @@ export class GeminiLiveClient {
   private buildSystemInstruction(): string {
     const personalityTraits = PERSONALITY_TRAITS[this.personality] || PERSONALITY_TRAITS.classic;
 
-    return `You are the host of a trivia game.
+    return `You are ${this.hostName}, the host of a trivia game.
 
 CORE RESPONSIBILITIES:
 - Present trivia questions clearly
