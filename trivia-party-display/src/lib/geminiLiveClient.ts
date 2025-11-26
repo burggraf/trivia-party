@@ -425,11 +425,23 @@ Remember: Family-friendly language, respectful to all teams. Speak naturally - n
     }
 
     // Stop any current playback before sending new message
-    if (this.isPlaying) {
-      console.log('[GeminiLive] Interrupting current playback for new message');
+    if (this.isPlaying || this.state === 'speaking') {
+      console.log('[GeminiLive] Interrupting - reconnecting for immediate response');
       this.stopPlayback();
-      // Ignore any remaining audio from the old response
-      this.ignoreAudioUntilNewTurn = true;
+      this.ignoreAudioUntilNewTurn = false;
+
+      // Queue the message and reconnect to force Gemini to start fresh
+      this.reconnectWithMessage(text);
+      return;
+    }
+
+    this.sendMessageInternal(text);
+  }
+
+  private sendMessageInternal(text: string): void {
+    if (this.ws?.readyState !== WebSocket.OPEN) {
+      console.warn('[GeminiLive] Cannot send message, not connected');
+      return;
     }
 
     const message: GeminiClientContentMessage = {
@@ -444,6 +456,22 @@ Remember: Family-friendly language, respectful to all teams. Speak naturally - n
 
     console.log('[GeminiLive] Sending message:', text.substring(0, 100) + '...');
     this.ws.send(JSON.stringify(message));
+  }
+
+  private async reconnectWithMessage(text: string): Promise<void> {
+    // Close current connection
+    this.ws?.close();
+    this.ws = null;
+
+    // Reconnect
+    try {
+      await this.connect();
+      // Send the message after reconnecting
+      this.sendMessageInternal(text);
+    } catch (error) {
+      console.error('[GeminiLive] Failed to reconnect:', error);
+      this.onError?.(error as Error);
+    }
   }
 
   private setState(newState: ConnectionState): void {
