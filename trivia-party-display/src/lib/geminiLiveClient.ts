@@ -60,6 +60,7 @@ export class GeminiLiveClient {
   private nextPlayTime: number = 0; // Scheduled playback time
   private activeSources: AudioBufferSourceNode[] = []; // Track for interruption
   private monitorInterval: ReturnType<typeof setInterval> | null = null;
+  private ignoreAudioUntilNewTurn: boolean = false; // Ignore old audio after interrupt
   private state: ConnectionState = 'disconnected';
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 3;
@@ -232,6 +233,12 @@ Remember: Family-friendly language, respectful to all teams. Speak naturally - n
 
       // Handle audio chunks
       if (message.serverContent?.modelTurn?.parts) {
+        // Skip old audio if we interrupted and are waiting for new turn
+        if (this.ignoreAudioUntilNewTurn) {
+          console.log('[GeminiLive] Ignoring audio from interrupted turn');
+          return;
+        }
+
         let hasAudio = false;
 
         message.serverContent.modelTurn.parts.forEach((part) => {
@@ -254,6 +261,14 @@ Remember: Family-friendly language, respectful to all teams. Speak naturally - n
       // Turn complete
       if (message.serverContent?.turnComplete) {
         console.log('[GeminiLive] Turn complete');
+
+        // If we were ignoring audio from an interrupted turn, we're now ready for new audio
+        if (this.ignoreAudioUntilNewTurn) {
+          console.log('[GeminiLive] Old turn finished, ready for new audio');
+          this.ignoreAudioUntilNewTurn = false;
+          return;
+        }
+
         // Wait for audio queue to finish, then return to connected state
         setTimeout(() => {
           if (!this.isPlaying) {
@@ -370,9 +385,10 @@ Remember: Family-friendly language, respectful to all teams. Speak naturally - n
       this.monitorInterval = null;
     }
 
-    // Reset timing
+    // Reset state
     this.isPlaying = false;
     this.nextPlayTime = 0;
+    // Note: don't reset ignoreAudioUntilNewTurn here - it's managed by sendMessage/handleMessage
   }
 
   private monitorPlayback(): void {
@@ -412,6 +428,8 @@ Remember: Family-friendly language, respectful to all teams. Speak naturally - n
     if (this.isPlaying) {
       console.log('[GeminiLive] Interrupting current playback for new message');
       this.stopPlayback();
+      // Ignore any remaining audio from the old response
+      this.ignoreAudioUntilNewTurn = true;
     }
 
     const message: GeminiClientContentMessage = {
@@ -443,6 +461,7 @@ Remember: Family-friendly language, respectful to all teams. Speak naturally - n
   disconnect(): void {
     console.log('[GeminiLive] Disconnecting...');
     this.stopPlayback();
+    this.ignoreAudioUntilNewTurn = false;
     this.ws?.close();
     this.ws = null;
     this.setState('disconnected');
