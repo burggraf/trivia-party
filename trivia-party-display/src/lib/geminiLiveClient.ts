@@ -57,6 +57,7 @@ export class GeminiLiveClient {
   private audioContext: AudioContext;
   private audioQueue: AudioBuffer[] = [];
   private isPlaying: boolean = false;
+  private nextPlayTime: number = 0; // Scheduled playback time
   private state: ConnectionState = 'disconnected';
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 3;
@@ -308,23 +309,49 @@ Remember: Family-friendly language, respectful to all teams. Speak naturally - n
 
     this.isPlaying = true;
 
-    while (this.audioQueue.length > 0) {
-      const buffer = this.audioQueue.shift()!;
-      await this.playAudioBuffer(buffer);
+    // Use scheduled playback for gapless audio
+    // Initialize nextPlayTime if this is a fresh start
+    const now = this.audioContext.currentTime;
+    if (this.nextPlayTime < now) {
+      this.nextPlayTime = now;
     }
 
-    this.isPlaying = false;
-    this.setState('connected');
+    while (this.audioQueue.length > 0) {
+      const buffer = this.audioQueue.shift()!;
+      this.scheduleBuffer(buffer);
+    }
+
+    // Keep checking if more buffers arrive or playback is done
+    this.monitorPlayback();
   }
 
-  private playAudioBuffer(buffer: AudioBuffer): Promise<void> {
-    return new Promise((resolve) => {
-      const source = this.audioContext.createBufferSource();
-      source.buffer = buffer;
-      source.connect(this.audioContext.destination);
-      source.onended = () => resolve();
-      source.start();
-    });
+  private scheduleBuffer(buffer: AudioBuffer): void {
+    const source = this.audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(this.audioContext.destination);
+
+    // Schedule at exact time for gapless playback
+    source.start(this.nextPlayTime);
+    this.nextPlayTime += buffer.duration;
+  }
+
+  private monitorPlayback(): void {
+    // Check periodically if playback is complete and no new buffers
+    const checkInterval = setInterval(() => {
+      // Process any new buffers that arrived
+      while (this.audioQueue.length > 0) {
+        const buffer = this.audioQueue.shift()!;
+        this.scheduleBuffer(buffer);
+      }
+
+      // Check if all scheduled audio has finished
+      const now = this.audioContext.currentTime;
+      if (now >= this.nextPlayTime && this.audioQueue.length === 0) {
+        clearInterval(checkInterval);
+        this.isPlaying = false;
+        this.setState('connected');
+      }
+    }, 100);
   }
 
   sendMessage(text: string): void {
@@ -365,6 +392,7 @@ Remember: Family-friendly language, respectful to all teams. Speak naturally - n
     this.ws = null;
     this.audioQueue = [];
     this.isPlaying = false;
+    this.nextPlayTime = 0;
     this.setState('disconnected');
   }
 }
