@@ -12,6 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { getAvailableCategories } from '@/components/ui/CategoryIcon'
 import CategoryIcon from '@/components/ui/CategoryIcon'
 import TimersAccordion from './TimersAccordion'
+import VoiceAccordion from './VoiceAccordion'
 
 interface GameEditModalProps {
   game: Game | null
@@ -37,6 +38,7 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
     game_end_timer?: number | null;
     thanks_timer?: number | null;
     auto_reveal_on_all_answered?: boolean;
+    ai_voice?: string;
   }>({
     name: '',
     startdate: '',
@@ -52,7 +54,8 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
     round_end_timer: null,
     game_end_timer: null,
     thanks_timer: null,
-    auto_reveal_on_all_answered: false
+    auto_reveal_on_all_answered: false,
+    ai_voice: 'Kore'
   })
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
@@ -75,7 +78,8 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
         round_end_timer: game.metadata?.round_end_timer || null,
         game_end_timer: game.metadata?.game_end_timer || null,
         thanks_timer: game.metadata?.thanks_timer || null,
-        auto_reveal_on_all_answered: game.metadata?.auto_reveal_on_all_answered ?? false
+        auto_reveal_on_all_answered: game.metadata?.auto_reveal_on_all_answered ?? false,
+        ai_voice: game.metadata?.ai_voice || 'Kore'
       })
     } else {
       // Calculate smart default start date/time
@@ -115,7 +119,8 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
         round_end_timer: null,
         game_end_timer: null,
         thanks_timer: null,
-        auto_reveal_on_all_answered: false
+        auto_reveal_on_all_answered: false,
+        ai_voice: 'Kore'
       })
     }
   }, [game])
@@ -132,7 +137,8 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
       round_end_timer: ('round_end_timer' in formData ? formData.round_end_timer : null) || null,
       game_end_timer: ('game_end_timer' in formData ? formData.game_end_timer : null) || null,
       thanks_timer: ('thanks_timer' in formData ? formData.thanks_timer : null) || null,
-      auto_reveal_on_all_answered: ('auto_reveal_on_all_answered' in formData ? formData.auto_reveal_on_all_answered : false)
+      auto_reveal_on_all_answered: ('auto_reveal_on_all_answered' in formData ? formData.auto_reveal_on_all_answered : false),
+      ai_voice: ('ai_voice' in formData ? formData.ai_voice : 'Kore') || 'Kore'
     }
 
     const submitData = {
@@ -436,6 +442,14 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
                     setFormData(prev => ({ ...prev, ...timers }))
                   }}
                   onCopyFromPrevious={handleCopyTimersFromPreviousGame}
+                />
+
+                {/* Voice Section */}
+                <VoiceAccordion
+                  selectedVoice={'ai_voice' in formData ? formData.ai_voice || 'Kore' : 'Kore'}
+                  onVoiceChange={(voice) => {
+                    setFormData(prev => ({ ...prev, ai_voice: voice }))
+                  }}
                 />
               </Accordion>
             </div>

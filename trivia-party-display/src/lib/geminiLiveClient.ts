@@ -31,7 +31,7 @@ export class GeminiLiveClient {
   onStateChange: ((state: ConnectionState) => void) | null = null;
   onError: ((error: Error) => void) | null = null;
 
-  constructor(private gameId: string) {
+  constructor(private gameId: string, private voiceName: string = 'Kore') {
     this.audioContext = new AudioContext({ sampleRate: 24000 });
   }
 
@@ -130,7 +130,7 @@ export class GeminiLiveClient {
           speech_config: {
             voice_config: {
               prebuilt_voice_config: {
-                voice_name: "Kore" // Male voice
+                voice_name: this.voiceName
               }
             }
           }

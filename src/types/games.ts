@@ -30,6 +30,9 @@ export interface GameMetadata {
 
   // Auto-reveal behavior
   auto_reveal_on_all_answered?: boolean; // Automatically reveal when all teams answer
+
+  // AI Voice
+  ai_voice?: string; // Voice name for AI host (default: 'Kore')
 }
 
 export interface Game {
