@@ -70,14 +70,11 @@ export default function QuestionsList({ roundId, roundTitle }: QuestionsListProp
     try {
       setRecyclingQuestionId(roundQuestionId)
 
-      // Step 1: Get a new random question from the round's categories
-      const newQuestion = await questionsService.getRandomQuestionsFromCategories(
-        round.categories,
-        1
-      )
+      // Step 1: Get a new random question
+      const newQuestion = await questionsService.getRandomQuestions(1)
 
       if (newQuestion.length === 0) {
-        console.warn('No new questions available from categories:', round.categories)
+        console.warn('No new questions available')
         return
       }
 
@@ -197,7 +194,7 @@ export default function QuestionsList({ roundId, roundTitle }: QuestionsListProp
             <div className="text-center">
               <p className="text-[13px] text-slate-600 dark:text-slate-300 mb-1">No questions found</p>
               <p className="text-[12px] text-slate-500 dark:text-slate-300">
-                Questions will be added when the round is created with categories selected
+                Questions will be added when the round is created
               </p>
             </div>
           </div>
@@ -264,7 +261,7 @@ export default function QuestionsList({ roundId, roundTitle }: QuestionsListProp
                 </div>
                 <button
                   onClick={() => handleRecycleQuestion(roundQuestion.id)}
-                  disabled={recyclingQuestionId === roundQuestion.id || !round?.categories || round.categories.length === 0}
+                  disabled={recyclingQuestionId === roundQuestion.id}
                   className="w-8 h-8 flex items-center justify-center rounded-md border border-[#e5e5e5] dark:border-slate-700 text-[#737373] dark:text-slate-400 hover:bg-[#fafafa] dark:hover:bg-slate-700 hover:border-[#d4d4d4] dark:hover:border-slate-600 hover:text-[#0a0a0a] dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Replace with a new question"
                 >

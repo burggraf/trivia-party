@@ -4,9 +4,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
-import { getAvailableCategories } from '@/components/ui/CategoryIcon'
-import CategoryIcon from '@/components/ui/CategoryIcon'
 
 interface RoundEditModalProps {
   round: Round | null
@@ -22,7 +19,6 @@ export default function RoundEditModal({ round, isOpen, onClose, onSave, onDelet
   const [formData, setFormData] = useState<UpdateRoundData>({
     title: '',
     question_count: 10,
-    categories: [],
     sequence_number: 1
   })
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -33,7 +29,6 @@ export default function RoundEditModal({ round, isOpen, onClose, onSave, onDelet
       setFormData({
         title: round.title || '',
         question_count: round.question_count || 10,
-        categories: round.categories || [],
         sequence_number: round.sequence_number || 1
       })
     } else if (isCreateMode) {
@@ -41,7 +36,6 @@ export default function RoundEditModal({ round, isOpen, onClose, onSave, onDelet
       setFormData({
         title: '',
         question_count: 10,
-        categories: [],
         sequence_number: 1
       })
     }
@@ -64,29 +58,6 @@ export default function RoundEditModal({ round, isOpen, onClose, onSave, onDelet
 
   const handleInputChange = (field: keyof UpdateRoundData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
-  }
-
-  const handleCategoryToggle = (category: string, checked: boolean) => {
-    const currentCategories = formData.categories || []
-    if (checked) {
-      handleInputChange('categories', [...currentCategories, category])
-    } else {
-      handleInputChange('categories', currentCategories.filter(cat => cat !== category))
-    }
-  }
-
-  const handleToggleAllCategories = () => {
-    if (isAllCategoriesSelected()) {
-      handleInputChange('categories', [])
-    } else {
-      handleInputChange('categories', getAvailableCategories())
-    }
-  }
-
-  const isAllCategoriesSelected = () => {
-    const allCategories = getAvailableCategories()
-    const currentCategories = formData.categories || []
-    return allCategories.length > 0 && allCategories.every(category => currentCategories.includes(category))
   }
 
   const handleDeleteClick = () => {
@@ -178,53 +149,13 @@ export default function RoundEditModal({ round, isOpen, onClose, onSave, onDelet
               </div>
             </div>
 
-            {/* Categories Section - Full Width at Bottom */}
-            <div className="border-t pt-4">
-              <div className="mb-4">
-                <div className="flex items-center justify-between mb-4">
-                  <Label className="text-base font-medium">Categories</Label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500 dark:text-slate-300">
-                      {formData.categories?.length || 0} of {getAvailableCategories().length} selected
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleToggleAllCategories}
-                      className="text-xs h-7"
-                    >
-                      {isAllCategoriesSelected() ? 'Check None' : 'Check All'}
-                    </Button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {getAvailableCategories().map((category) => (
-                    <div key={category} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={category}
-                        checked={formData.categories?.includes(category) || false}
-                        onCheckedChange={(checked) => handleCategoryToggle(category, checked as boolean)}
-                      />
-                      <Label
-                        htmlFor={category}
-                        className="text-sm font-normal cursor-pointer flex items-center gap-2"
-                      >
-                        <CategoryIcon category={category} size={14} />
-                        {category}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
             <DialogFooter>
               <div className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 w-full">
                 <div className="flex flex-col-reverse sm:flex-row sm:justify-start sm:space-x-2">
                   <Button type="button" variant="outline" onClick={onClose}>
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={isLoading || !formData.categories || formData.categories.length === 0}>
+                  <Button type="submit" disabled={isLoading}>
                     {isLoading ? 'Saving...' : (isCreateMode ? 'Add Round' : 'Save Changes')}
                   </Button>
                 </div>
@@ -276,7 +207,7 @@ export default function RoundEditModal({ round, isOpen, onClose, onSave, onDelet
           <DialogHeader>
             <DialogTitle>Replace Round Questions?</DialogTitle>
             <DialogDescription>
-              This will delete all existing questions for this round and generate new questions based on the selected categories and question count.
+              This will delete all existing questions for this round and generate new random questions based on the question count.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">

@@ -7,7 +7,6 @@ import GameEditModal from '@/components/games/GameEditModal'
 import RoundEditModal from '@/components/games/RoundEditModal'
 import QuestionsList from '@/components/games/QuestionsList'
 import ConnectedDisplays from '@/components/games/ConnectedDisplays'
-import CategoryIcon, { getAvailableCategories } from '@/components/ui/CategoryIcon'
 import { Info, Plus, Play, User } from 'lucide-react'
 import ProfileModal from '@/components/ProfileModal'
 import pb from '@/lib/pocketbase'
@@ -97,7 +96,6 @@ export default function HostPage() {
         id: '',
         title: '',
         question_count: 3,
-        categories: [],
         sequence_number: nextSequenceNumber,
         game: gameId,
         host: pb.authStore.model?.id || '',
@@ -110,15 +108,15 @@ export default function HostPage() {
     }
   }
 
-  const handleSaveGame = async (data: UpdateGameData | CreateGameData & { rounds?: number; questionsPerRound?: number; categories?: string[] }) => {
+  const handleSaveGame = async (data: UpdateGameData | CreateGameData & { rounds?: number; questionsPerRound?: number }) => {
     try {
       setSaving(true)
       if (isCreateMode) {
         // Create the game first
         const createdGame = await gamesService.createGame(data as CreateGameData)
 
-        // If rounds > 0 and categories are specified, create rounds with questions
-        if (data.rounds && data.rounds > 0 && data.categories && data.categories.length > 0) {
+        // If rounds > 0, create rounds with random questions
+        if (data.rounds && data.rounds > 0) {
           try {
             const questionsPerRound = data.questionsPerRound || 10
 
@@ -127,7 +125,6 @@ export default function HostPage() {
               const roundData = {
                 title: `Round ${i}`,
                 question_count: questionsPerRound,
-                categories: data.categories,
                 sequence_number: i,
                 game: createdGame.id
               }
@@ -136,8 +133,7 @@ export default function HostPage() {
 
               // Add random questions to the round
               try {
-                const selectedQuestions = await questionsService.getRandomQuestionsFromCategories(
-                  data.categories,
+                const selectedQuestions = await questionsService.getRandomQuestions(
                   questionsPerRound,
                   pb.authStore.model?.id
                 )
@@ -152,7 +148,7 @@ export default function HostPage() {
                   await gameQuestionsService.createGameQuestionsBatch(createdRound.id, questionsForRound)
                   console.log(`Added ${selectedQuestions.length} questions to "Round ${i}"`)
                 } else {
-                  console.warn(`No available questions found for categories: ${data.categories.join(', ')}`)
+                  console.warn(`No available questions found`)
                 }
               } catch (questionError) {
                 console.error(`Failed to add questions to Round ${i}:`, questionError)
@@ -222,12 +218,11 @@ export default function HostPage() {
           game: currentGameId
         } as CreateRoundData)
 
-        // If categories and question count are specified, add questions to the round
-        if (data.categories && data.categories.length > 0 && data.question_count && data.question_count > 0) {
+        // If question count is specified, add random questions to the round
+        if (data.question_count && data.question_count > 0) {
           try {
-            // Get random questions from the selected categories that haven't been used by this host
-            const selectedQuestions = await questionsService.getRandomQuestionsFromCategories(
-              data.categories,
+            // Get random questions that haven't been used by this host
+            const selectedQuestions = await questionsService.getRandomQuestions(
               data.question_count,
               pb.authStore.model?.id
             )
@@ -243,7 +238,7 @@ export default function HostPage() {
               await gameQuestionsService.createGameQuestionsBatch(createdRound.id, questionsForRound)
               console.log(`Added ${selectedQuestions.length} questions to round "${createdRound.title}"`)
             } else {
-              console.warn(`No available questions found for categories: ${data.categories.join(', ')}`)
+              console.warn(`No available questions found`)
             }
           } catch (questionError) {
             console.error('Failed to add questions to round:', questionError)
@@ -262,11 +257,10 @@ export default function HostPage() {
         await roundsService.updateRound(editingRound.id, data)
 
         // If replacing questions, generate new ones
-        if (shouldReplaceQuestions && data.categories && data.categories.length > 0 && data.question_count && data.question_count > 0) {
+        if (shouldReplaceQuestions && data.question_count && data.question_count > 0) {
           try {
-            // Get random questions from the selected categories that haven't been used by this host
-            const selectedQuestions = await questionsService.getRandomQuestionsFromCategories(
-              data.categories,
+            // Get random questions that haven't been used by this host
+            const selectedQuestions = await questionsService.getRandomQuestions(
               data.question_count,
               pb.authStore.model?.id
             )
@@ -282,7 +276,7 @@ export default function HostPage() {
               await gameQuestionsService.createGameQuestionsBatch(editingRound.id, questionsForRound)
               console.log(`Replaced questions for round "${editingRound.title}" with ${selectedQuestions.length} new questions`)
             } else {
-              console.warn(`No available questions found for categories: ${data.categories.join(', ')}`)
+              console.warn(`No available questions found`)
             }
           } catch (questionError) {
             console.error('Failed to add questions to round:', questionError)
@@ -560,23 +554,6 @@ export default function HostPage() {
                                         <span className="text-[12px] text-[#737373] dark:text-slate-400 bg-white dark:bg-slate-900 px-2 py-0.5 rounded border border-[#e5e5e5] dark:border-slate-700">
                                           {round.question_count} questions
                                         </span>
-                                        <div className="flex gap-1">
-                                          {getAvailableCategories().map((category) => {
-                                            const isUsed = round.categories && round.categories.includes(category)
-                                            return (
-                                              <div key={category} title={category}>
-                                                <CategoryIcon
-                                                  category={category}
-                                                  size={14}
-                                                  className={`${isUsed
-                                                    ? 'text-[#525252] dark:text-slate-300'
-                                                    : 'text-[#d4d4d4] dark:text-slate-500'
-                                                  }`}
-                                                />
-                                              </div>
-                                            )
-                                          })}
-                                        </div>
                                       </div>
                                     </div>
                                   </div>

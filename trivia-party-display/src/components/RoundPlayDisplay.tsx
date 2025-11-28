@@ -21,6 +21,7 @@ interface RoundPlayDisplayProps {
       category: string
       question: string
       difficulty: string
+      level?: number
       a: string
       b: string
       c: string
@@ -194,7 +195,7 @@ export default function RoundPlayDisplay({ gameData, mode = 'controller', onAnsw
           Round {roundNumber} of {totalRounds} - Question {questionNumber}
         </h2>
         <Badge variant="outline" className="text-xs px-2 py-0.5">
-          {gameData.question.difficulty}
+          {gameData.question.difficulty}{gameData.question.level !== undefined && ` ${gameData.question.level}`}
         </Badge>
       </div>
 

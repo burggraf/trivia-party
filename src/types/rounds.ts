@@ -2,7 +2,6 @@ export interface Round {
   id: string;
   title: string;
   question_count: number;
-  categories: string[];
   sequence_number: number;
   game: string;
   host: string;
@@ -13,7 +12,6 @@ export interface Round {
 export interface CreateRoundData {
   title: string;
   question_count: number;
-  categories: string[];
   sequence_number: number;
   game: string;
 }
@@ -21,7 +19,6 @@ export interface CreateRoundData {
 export interface UpdateRoundData {
   title?: string;
   question_count?: number;
-  categories?: string[];
   sequence_number?: number;
 }
 

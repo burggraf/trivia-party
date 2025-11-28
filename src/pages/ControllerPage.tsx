@@ -40,6 +40,7 @@ interface GameData {
     category: string
     question: string
     difficulty: string
+    level?: number
     a: string
     b: string
     c: string
@@ -610,6 +611,7 @@ export default function ControllerPage() {
                 category: nextQuestion.category,
                 question: nextQuestion.question,
                 difficulty: nextQuestion.difficulty,
+                level: nextQuestion.level ? parseInt(String(nextQuestion.level)) : undefined,
                 a: shuffled.shuffledAnswers[0].text,
                 b: shuffled.shuffledAnswers[1].text,
                 c: shuffled.shuffledAnswers[2].text,
@@ -695,6 +697,7 @@ export default function ControllerPage() {
                 category: firstQuestion.category,
                 question: firstQuestion.question,
                 difficulty: firstQuestion.difficulty,
+                level: firstQuestion.level ? parseInt(String(firstQuestion.level)) : undefined,
                 a: shuffled.shuffledAnswers[0].text,
                 b: shuffled.shuffledAnswers[1].text,
                 c: shuffled.shuffledAnswers[2].text,
@@ -838,6 +841,7 @@ export default function ControllerPage() {
                   category: prevQuestion.category,
                   question: prevQuestion.question,
                   difficulty: prevQuestion.difficulty,
+                  level: prevQuestion.level ? parseInt(String(prevQuestion.level)) : undefined,
                   a: shuffled.shuffledAnswers[0].text,
                   b: shuffled.shuffledAnswers[1].text,
                   c: shuffled.shuffledAnswers[2].text,

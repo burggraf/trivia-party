@@ -15,6 +15,7 @@ interface RoundPlayProps {
       category: string
       question: string
       difficulty: string
+      level?: number
       a: string
       b: string
       c: string

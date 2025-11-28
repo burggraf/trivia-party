@@ -8,9 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { useToast } from '@/hooks/use-toast'
 import { gamesService } from '@/lib/games'
-import { Checkbox } from '@/components/ui/checkbox'
-import { getAvailableCategories } from '@/components/ui/CategoryIcon'
-import CategoryIcon from '@/components/ui/CategoryIcon'
 import TimersAccordion from './TimersAccordion'
 import VoiceAccordion from './VoiceAccordion'
 
@@ -18,7 +15,7 @@ interface GameEditModalProps {
   game: Game | null
   isOpen: boolean
   onClose: () => void
-  onSave: (data: UpdateGameData | CreateGameData & { rounds?: number; questionsPerRound?: number; categories?: string[] }) => Promise<void>
+  onSave: (data: UpdateGameData | CreateGameData & { rounds?: number; questionsPerRound?: number }) => Promise<void>
   onDelete?: () => Promise<void>
   isLoading?: boolean
 }
@@ -29,7 +26,6 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
   const [formData, setFormData] = useState<UpdateGameData | CreateGameData & {
     rounds?: number;
     questionsPerRound?: number;
-    categories?: string[];
     question_timer?: number | null;
     answer_timer?: number | null;
     game_start_timer?: number | null;
@@ -47,7 +43,6 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
     location: '',
     rounds: 3,
     questionsPerRound: 10,
-    categories: [],
     question_timer: null,
     answer_timer: null,
     game_start_timer: null,
@@ -72,7 +67,6 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
         location: game.location || '',
         rounds: 3,
         questionsPerRound: 10,
-        categories: [],
         question_timer: game.metadata?.question_timer || null,
         answer_timer: game.metadata?.answer_timer || null,
         game_start_timer: game.metadata?.game_start_timer || null,
@@ -114,7 +108,6 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
         location: '',
         rounds: 3,
         questionsPerRound: 10,
-        categories: getAvailableCategories(), // Default to all categories for new games
         question_timer: null,
         answer_timer: null,
         game_start_timer: null,
@@ -157,35 +150,12 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
   }
 
   const handleInputChange = (
-    field: keyof (UpdateGameData | CreateGameData) | 'rounds' | 'questionsPerRound' | 'categories' |
+    field: keyof (UpdateGameData | CreateGameData) | 'rounds' | 'questionsPerRound' |
            'question_timer' | 'answer_timer' | 'game_start_timer' | 'round_start_timer' | 'round_end_timer' | 'game_end_timer' | 'thanks_timer' |
            'auto_reveal_on_all_answered',
-    value: string | number | string[] | null | undefined | boolean
+    value: string | number | null | undefined | boolean
   ) => {
     setFormData(prev => ({ ...prev, [field]: value }))
-  }
-
-  const handleCategoryToggle = (category: string, checked: boolean) => {
-    const currentCategories = formData.categories || []
-    if (checked) {
-      handleInputChange('categories', [...currentCategories, category])
-    } else {
-      handleInputChange('categories', currentCategories.filter((cat: string) => cat !== category))
-    }
-  }
-
-  const handleToggleAllCategories = () => {
-    if (isAllCategoriesSelected()) {
-      handleInputChange('categories', [])
-    } else {
-      handleInputChange('categories', getAvailableCategories())
-    }
-  }
-
-  const isAllCategoriesSelected = () => {
-    const allCategories = getAvailableCategories()
-    const currentCategories = formData.categories || []
-    return allCategories.length > 0 && allCategories.every(category => currentCategories.includes(category))
   }
 
   const handleDeleteClick = () => {
@@ -388,44 +358,6 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
                           </div>
                         </div>
 
-                        {/* Categories */}
-                        <div className="border-t pt-4">
-                          <div className="flex items-center justify-between mb-4">
-                            <Label className="text-base font-medium">Categories</Label>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-slate-500 dark:text-slate-300">
-                                {formData.categories?.length || 0} of {getAvailableCategories().length} selected
-                              </span>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={handleToggleAllCategories}
-                                className="text-xs h-7"
-                              >
-                                {isAllCategoriesSelected() ? 'Check None' : 'Check All'}
-                              </Button>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3 max-h-40 overflow-y-auto">
-                            {getAvailableCategories().map((category) => (
-                              <div key={category} className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={category}
-                                  checked={formData.categories?.includes(category) || false}
-                                  onCheckedChange={(checked) => handleCategoryToggle(category, checked as boolean)}
-                                />
-                                <Label
-                                  htmlFor={category}
-                                  className="text-sm font-normal cursor-pointer flex items-center gap-2"
-                                >
-                                  <CategoryIcon category={category} size={14} />
-                                  {category}
-                                </Label>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
                       </div>
                     </AccordionContent>
                   </AccordionItem>
@@ -468,7 +400,7 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
                   <Button type="button" variant="outline" onClick={onClose}>
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={isLoading || (!isEdit && (formData.rounds || 0) > 0 && (!formData.categories || formData.categories.length === 0))}>
+                  <Button type="submit" disabled={isLoading}>
                     {isLoading ? 'Saving...' : (isEdit ? 'Save Changes' : 'Create Game')}
                   </Button>
                 </div>
