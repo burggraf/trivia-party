@@ -288,10 +288,14 @@ ${scoreAnalysis ? `\n${scoreAnalysis}.` : ''}`;
 
     const questionNumber = question.question_number;
     const totalQuestions = gameData.round?.question_count ?? '?';
+    const category = question.category || 'General';
+    const level = question.level ?? 'unknown';
     const isLastQuestion = questionNumber === totalQuestions;
 
     // Direct format - just the question and answers to read
     const prompt = `Question ${questionNumber} of ${totalQuestions}${isLastQuestion ? ' - last question of the round!' : ''}
+Category: ${category}
+Level: ${level}
 
 "${question.question}"
 
@@ -300,7 +304,8 @@ B: ${question.b}
 C: ${question.c}
 D: ${question.d}
 
-Read the question and all four choices clearly. Tell teams to discuss and submit their answers.`;
+IMPORTANT: You MUST read the category name, level and the full question and ALL answer choices clearly.
+Tell teams to discuss and submit their answers.`;
 
     this.geminiClient.sendMessage(prompt);
   }
