@@ -15,7 +15,7 @@ interface GameEditModalProps {
   game: Game | null
   isOpen: boolean
   onClose: () => void
-  onSave: (data: UpdateGameData | CreateGameData & { rounds?: number; questionsPerRound?: number }) => Promise<void>
+  onSave: (data: UpdateGameData | CreateGameData & { rounds?: number; questionsPerRound?: number; minLevel?: number; maxLevel?: number }) => Promise<void>
   onDelete?: () => Promise<void>
   isLoading?: boolean
 }
@@ -26,6 +26,8 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
   const [formData, setFormData] = useState<UpdateGameData | CreateGameData & {
     rounds?: number;
     questionsPerRound?: number;
+    minLevel?: number;
+    maxLevel?: number;
     question_timer?: number | null;
     answer_timer?: number | null;
     game_start_timer?: number | null;
@@ -43,6 +45,8 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
     location: '',
     rounds: 3,
     questionsPerRound: 10,
+    minLevel: 1,
+    maxLevel: 9,
     question_timer: null,
     answer_timer: null,
     game_start_timer: null,
@@ -67,6 +71,8 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
         location: game.location || '',
         rounds: 3,
         questionsPerRound: 10,
+        minLevel: 1,
+        maxLevel: 9,
         question_timer: game.metadata?.question_timer || null,
         answer_timer: game.metadata?.answer_timer || null,
         game_start_timer: game.metadata?.game_start_timer || null,
@@ -108,6 +114,8 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
         location: '',
         rounds: 3,
         questionsPerRound: 10,
+        minLevel: 1,
+        maxLevel: 9,
         question_timer: null,
         answer_timer: null,
         game_start_timer: null,
@@ -150,7 +158,7 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
   }
 
   const handleInputChange = (
-    field: keyof (UpdateGameData | CreateGameData) | 'rounds' | 'questionsPerRound' |
+    field: keyof (UpdateGameData | CreateGameData) | 'rounds' | 'questionsPerRound' | 'minLevel' | 'maxLevel' |
            'question_timer' | 'answer_timer' | 'game_start_timer' | 'round_start_timer' | 'round_end_timer' | 'game_end_timer' | 'thanks_timer' |
            'auto_reveal_on_all_answered',
     value: string | number | null | undefined | boolean
@@ -354,6 +362,36 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
                               className="w-16 text-center"
                               placeholder="per round"
                               required
+                            />
+                          </div>
+                        </div>
+
+                        {/* Difficulty Level Range */}
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="minLevel" className="text-right">
+                            Level
+                          </Label>
+                          <div className="col-span-3 flex gap-4 items-center">
+                            <Input
+                              id="minLevel"
+                              type="number"
+                              min="1"
+                              max="9"
+                              value={'minLevel' in formData ? formData.minLevel : 1}
+                              onChange={(e) => handleInputChange('minLevel', parseInt(e.target.value) || 1)}
+                              className="w-16 text-center"
+                            />
+                            <Label className="text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                              to
+                            </Label>
+                            <Input
+                              id="maxLevel"
+                              type="number"
+                              min="1"
+                              max="9"
+                              value={'maxLevel' in formData ? formData.maxLevel : 9}
+                              onChange={(e) => handleInputChange('maxLevel', parseInt(e.target.value) || 9)}
+                              className="w-16 text-center"
                             />
                           </div>
                         </div>

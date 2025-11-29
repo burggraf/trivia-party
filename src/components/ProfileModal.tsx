@@ -43,7 +43,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       return avatarPreview
     }
     if (pb.authStore.model?.avatar) {
-      return pb.files.getUrl(pb.authStore.model, pb.authStore.model.avatar)
+      return pb.files.getURL(pb.authStore.model, pb.authStore.model.avatar)
     }
     return null
   }

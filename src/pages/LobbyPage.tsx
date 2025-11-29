@@ -180,7 +180,7 @@ export default function LobbyPage() {
           >
             {pb.authStore.model?.avatar ? (
               <img
-                src={pb.files.getUrl(pb.authStore.model, pb.authStore.model.avatar)}
+                src={pb.files.getURL(pb.authStore.model, pb.authStore.model.avatar)}
                 alt="Profile"
                 className="h-8 w-8 rounded-full object-cover"
               />

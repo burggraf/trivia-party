@@ -61,16 +61,29 @@ export const questionsService = {
 
   async getRandomQuestions(
     questionCount: number,
-    hostId?: string
+    hostId?: string,
+    minLevel?: number,
+    maxLevel?: number
   ): Promise<Question[]> {
     try {
       const currentHostId = hostId || pb.authStore.model?.id;
       if (!currentHostId) throw new Error('User not authenticated');
 
+      // Build level filter if specified
+      const levelFilters: string[] = [];
+      if (minLevel !== undefined) {
+        levelFilters.push(`level >= ${minLevel}`);
+      }
+      if (maxLevel !== undefined) {
+        levelFilters.push(`level <= ${maxLevel}`);
+      }
+      const levelFilter = levelFilters.length > 0 ? levelFilters.join(' && ') : undefined;
+
       // Step 1: Fetch a reasonable pool of random questions from all categories
       // Use server-side random sorting and fetch 10x the needed amount to ensure enough after filtering
       const poolSize = Math.min(questionCount * 10, 1000); // Cap at 1000 to avoid rate limits
       const randomQuestionsResult = await pb.collection('questions').getList<Question>(1, poolSize, {
+        filter: levelFilter,
         sort: '@random', // Server-side random sorting
         skipTotal: true  // Skip counting total records for performance
       });

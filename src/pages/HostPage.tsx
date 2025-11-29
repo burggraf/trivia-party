@@ -108,7 +108,7 @@ export default function HostPage() {
     }
   }
 
-  const handleSaveGame = async (data: UpdateGameData | CreateGameData & { rounds?: number; questionsPerRound?: number }) => {
+  const handleSaveGame = async (data: UpdateGameData | CreateGameData & { rounds?: number; questionsPerRound?: number; minLevel?: number; maxLevel?: number }) => {
     try {
       setSaving(true)
       if (isCreateMode) {
@@ -119,6 +119,8 @@ export default function HostPage() {
         if (data.rounds && data.rounds > 0) {
           try {
             const questionsPerRound = data.questionsPerRound || 10
+            const minLevel = 'minLevel' in data ? data.minLevel || 1 : 1
+            const maxLevel = 'maxLevel' in data ? data.maxLevel || 9 : 9
 
             for (let i = 1; i <= data.rounds; i++) {
               // Create each round
@@ -135,11 +137,20 @@ export default function HostPage() {
               try {
                 const selectedQuestions = await questionsService.getRandomQuestions(
                   questionsPerRound,
-                  pb.authStore.model?.id
+                  pb.authStore.model?.id,
+                  minLevel,
+                  maxLevel
                 )
 
                 if (selectedQuestions.length > 0) {
-                  const questionsForRound = selectedQuestions.map((question, index) => ({
+                  // Sort questions by level ascending before assigning sequence numbers
+                  const sortedQuestions = [...selectedQuestions].sort((a, b) => {
+                    const levelA = a.level ? parseInt(String(a.level)) : 0
+                    const levelB = b.level ? parseInt(String(b.level)) : 0
+                    return levelA - levelB
+                  })
+
+                  const questionsForRound = sortedQuestions.map((question, index) => ({
                     questionId: question.id,
                     sequence: index + 1,
                     categoryName: question.category
@@ -228,8 +239,15 @@ export default function HostPage() {
             )
 
             if (selectedQuestions.length > 0) {
+              // Sort questions by level ascending before assigning sequence numbers
+              const sortedQuestions = [...selectedQuestions].sort((a, b) => {
+                const levelA = a.level ? parseInt(String(a.level)) : 0
+                const levelB = b.level ? parseInt(String(b.level)) : 0
+                return levelA - levelB
+              })
+
               // Create game_questions entries
-              const questionsForRound = selectedQuestions.map((question, index) => ({
+              const questionsForRound = sortedQuestions.map((question, index) => ({
                 questionId: question.id,
                 sequence: index + 1,
                 categoryName: question.category
@@ -266,8 +284,15 @@ export default function HostPage() {
             )
 
             if (selectedQuestions.length > 0) {
+              // Sort questions by level ascending before assigning sequence numbers
+              const sortedQuestions = [...selectedQuestions].sort((a, b) => {
+                const levelA = a.level ? parseInt(String(a.level)) : 0
+                const levelB = b.level ? parseInt(String(b.level)) : 0
+                return levelA - levelB
+              })
+
               // Create game_questions entries
-              const questionsForRound = selectedQuestions.map((question, index) => ({
+              const questionsForRound = sortedQuestions.map((question, index) => ({
                 questionId: question.id,
                 sequence: index + 1,
                 categoryName: question.category
@@ -389,7 +414,7 @@ export default function HostPage() {
           >
             {pb.authStore.model?.avatar ? (
               <img
-                src={pb.files.getUrl(pb.authStore.model, pb.authStore.model.avatar)}
+                src={pb.files.getURL(pb.authStore.model, pb.authStore.model.avatar)}
                 alt="Profile"
                 className="h-8 w-8 rounded-full object-cover"
               />

@@ -219,7 +219,7 @@ export default function QuestionsList({ roundId, roundTitle }: QuestionsListProp
                         roundQuestion.questionDetails.difficulty === 'medium' ? 'bg-[#fef3c7] dark:bg-yellow-950/40 text-[#92400e] dark:text-yellow-400 border-[#fde68a] dark:border-yellow-900/50' :
                         'bg-[#fee2e2] dark:bg-red-950/40 text-[#991b1b] dark:text-red-400 border-[#fecaca] dark:border-red-900/50'
                       }`}>
-                        {roundQuestion.questionDetails.difficulty}
+                        {roundQuestion.questionDetails.difficulty}{roundQuestion.questionDetails.level ? ` ${roundQuestion.questionDetails.level}` : ''}
                       </span>
                     )}
                   </div>
