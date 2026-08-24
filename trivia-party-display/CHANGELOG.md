@@ -2,6 +2,13 @@
 
 All notable changes to the Trivia Party Display application will be documented in this file.
 
+## [1.8.2] - 2026-08-24
+
+### Removed
+
+- Gemini Live AI host and associated Google Cloud credential requirements
+- AI voice and personality configuration
+
 ## [1.0.0] - 2025-11-11
 
 ### Added

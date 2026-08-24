@@ -9,7 +9,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { useToast } from '@/hooks/use-toast'
 import { gamesService } from '@/lib/games'
 import TimersAccordion from './TimersAccordion'
-import VoiceAccordion from './VoiceAccordion'
 
 interface GameEditModalProps {
   game: Game | null
@@ -36,8 +35,6 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
     game_end_timer?: number | null;
     thanks_timer?: number | null;
     auto_reveal_on_all_answered?: boolean;
-    ai_voice?: string;
-    ai_personality?: string;
   }>({
     name: '',
     startdate: '',
@@ -54,9 +51,7 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
     round_end_timer: null,
     game_end_timer: null,
     thanks_timer: null,
-    auto_reveal_on_all_answered: false,
-    ai_voice: 'Kore',
-    ai_personality: 'classic'
+    auto_reveal_on_all_answered: false
   })
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
@@ -80,9 +75,7 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
         round_end_timer: game.metadata?.round_end_timer || null,
         game_end_timer: game.metadata?.game_end_timer || null,
         thanks_timer: game.metadata?.thanks_timer || null,
-        auto_reveal_on_all_answered: game.metadata?.auto_reveal_on_all_answered ?? false,
-        ai_voice: game.metadata?.ai_voice || 'Kore',
-        ai_personality: game.metadata?.ai_personality || 'classic'
+        auto_reveal_on_all_answered: game.metadata?.auto_reveal_on_all_answered ?? false
       })
     } else {
       // Calculate smart default start date/time
@@ -123,9 +116,7 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
         round_end_timer: null,
         game_end_timer: null,
         thanks_timer: null,
-        auto_reveal_on_all_answered: false,
-        ai_voice: 'Kore',
-        ai_personality: 'classic'
+        auto_reveal_on_all_answered: false
       })
     }
   }, [game])
@@ -142,9 +133,7 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
       round_end_timer: ('round_end_timer' in formData ? formData.round_end_timer : null) || null,
       game_end_timer: ('game_end_timer' in formData ? formData.game_end_timer : null) || null,
       thanks_timer: ('thanks_timer' in formData ? formData.thanks_timer : null) || null,
-      auto_reveal_on_all_answered: ('auto_reveal_on_all_answered' in formData ? formData.auto_reveal_on_all_answered : false),
-      ai_voice: ('ai_voice' in formData ? formData.ai_voice : 'Kore') || 'Kore',
-      ai_personality: ('ai_personality' in formData ? formData.ai_personality : 'classic') || 'classic'
+      auto_reveal_on_all_answered: ('auto_reveal_on_all_answered' in formData ? formData.auto_reveal_on_all_answered : false)
     }
 
     const submitData = {
@@ -417,18 +406,6 @@ export default function GameEditModal({ game, isOpen, onClose, onSave, onDelete,
                     setFormData(prev => ({ ...prev, ...timers }))
                   }}
                   onCopyFromPrevious={handleCopyTimersFromPreviousGame}
-                />
-
-                {/* AI Host Section */}
-                <VoiceAccordion
-                  selectedVoice={'ai_voice' in formData ? formData.ai_voice || 'Kore' : 'Kore'}
-                  onVoiceChange={(voice) => {
-                    setFormData(prev => ({ ...prev, ai_voice: voice }))
-                  }}
-                  selectedPersonality={'ai_personality' in formData ? formData.ai_personality || 'classic' : 'classic'}
-                  onPersonalityChange={(personality) => {
-                    setFormData(prev => ({ ...prev, ai_personality: personality }))
-                  }}
                 />
               </Accordion>
             </div>
