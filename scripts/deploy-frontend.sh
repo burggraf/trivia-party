@@ -12,7 +12,7 @@ fi
 echo "✓ Build successful"
 
 echo "Deploying to server..."
-rsync -avz --delete dist/ $SERVER:$REMOTE_PATH/pb_public/
+rsync -avz --delete --exclude downloads/ dist/ $SERVER:$REMOTE_PATH/pb_public/
 
 echo "✓ Frontend deployed successfully!"
 echo "Visit https://trivia.azabab.com"

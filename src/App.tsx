@@ -9,6 +9,7 @@ import LobbyPage from './pages/LobbyPage'
 import JoinPage from './pages/JoinPage'
 import GamePage from './pages/GamePage'
 import ControllerPage from './pages/ControllerPage'
+import DownloadPage from './pages/DownloadPage'
 import AuthGuard from './components/AuthGuard'
 import { Toaster } from '@/components/ui/sonner'
 import { ThemeProvider } from './contexts/ThemeContext'
@@ -79,6 +80,7 @@ function App() {
 				<Routes>
 					<Route path='/' element={<LandingPage />} />
 					<Route path='/login' element={<AuthPage />} />
+					<Route path='/download' element={<DownloadPage />} />
 					<Route
 						path='/host'
 						element={isAuthenticated ? <HostPage /> : <Navigate to='/login' replace />}
