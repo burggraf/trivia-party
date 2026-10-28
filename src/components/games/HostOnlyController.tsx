@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
+import { Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,6 +28,7 @@ export default function HostOnlyController({ settings }: { settings: ReturnType<
   const [roundIndex, setRoundIndex] = useState(0)
   const [lastRoundIndex, setLastRoundIndex] = useState(0)
   const [presentedQuestions, setPresentedQuestions] = useState<Record<string, number>>({})
+  const [revealedRounds, setRevealedRounds] = useState<Record<string, boolean>>({})
   const [error, setError] = useState('')
   const [retry, setRetry] = useState(0)
   const [closing, setClosing] = useState(false)
@@ -102,6 +104,8 @@ export default function HostOnlyController({ settings }: { settings: ReturnType<
             roundCount={rounds.length}
             availableRounds={lastRoundIndex + 1}
             availableQuestions={presentedQuestions[round.id] ?? 1}
+            answersRevealed={revealedRounds[round.id] ?? false}
+            onRevealAnswers={() => setRevealedRounds(previous => ({ ...previous, [round.id]: true }))}
             onQuestionPresented={number => setPresentedQuestions(previous => ({
               ...previous, [round.id]: Math.max(previous[round.id] ?? 1, number),
             }))}
@@ -121,12 +125,14 @@ export default function HostOnlyController({ settings }: { settings: ReturnType<
   )
 }
 
-function HostOnlyRound({ round, roundNumber, roundCount, availableRounds, availableQuestions, onQuestionPresented, onRoundChange, onNextRound, onComplete, closing }: {
+function HostOnlyRound({ round, roundNumber, roundCount, availableRounds, availableQuestions, answersRevealed, onRevealAnswers, onQuestionPresented, onRoundChange, onNextRound, onComplete, closing }: {
   round: Round
   roundNumber: number
   roundCount: number
   availableRounds: number
   availableQuestions: number
+  answersRevealed: boolean
+  onRevealAnswers: () => void
   onQuestionPresented: (number: number) => void
   onRoundChange: (number: number) => void
   onNextRound: () => void
@@ -135,7 +141,7 @@ function HostOnlyRound({ round, roundNumber, roundCount, availableRounds, availa
 }) {
   const [questions, setQuestions] = useState<HostQuestion[] | null>(null)
   const [questionIndex, setQuestionIndex] = useState(0)
-  const [revealed, setRevealed] = useState(false)
+  const [showAnswers, setShowAnswers] = useState(false)
   const [error, setError] = useState('')
   const [retry, setRetry] = useState(0)
 
@@ -172,7 +178,7 @@ function HostOnlyRound({ round, roundNumber, roundCount, availableRounds, availa
 
   const question = questions?.[questionIndex]
   const lastQuestion = questions !== null && questionIndex === questions.length - 1
-  const canAdvanceRound = revealed || questions?.length === 0
+  const canAdvanceRound = showAnswers || questions?.length === 0
 
   return (
     <Card className="shadow-none">
@@ -180,17 +186,29 @@ function HostOnlyRound({ round, roundNumber, roundCount, availableRounds, availa
         <CardTitle className="text-lg md:text-2xl break-words text-center">{round.title}</CardTitle>
         <CardDescription className="grid grid-cols-2 gap-4">
           <NumberPicker label="Round" current={roundNumber} total={roundCount} available={availableRounds} onSelect={onRoundChange} />
-          {!revealed && questions && questions.length > 0 && (
+          {questions && questions.length > 0 && (
             <NumberPicker
               label="Question"
               current={questionIndex + 1}
               total={questions.length}
               available={availableQuestions}
-              onSelect={number => { if (number <= availableQuestions) setQuestionIndex(number - 1) }}
+              onSelect={number => {
+                if (number <= availableQuestions) {
+                  setShowAnswers(false)
+                  setQuestionIndex(number - 1)
+                }
+              }}
+              answers={{
+                revealed: answersRevealed,
+                showing: showAnswers,
+                onSelect: () => {
+                  if (answersRevealed) { setShowAnswers(true); window.scrollTo(0, 0) }
+                },
+              }}
             />
           )}
         </CardDescription>
-        {revealed && <CardDescription className="text-center">Round Answers</CardDescription>}
+        {showAnswers && <CardDescription className="text-center">Round Answers</CardDescription>}
       </CardHeader>
       <CardContent className="px-4 md:px-6 space-y-4 md:space-y-6">
         {error ? (
@@ -202,7 +220,7 @@ function HostOnlyRound({ round, roundNumber, roundCount, availableRounds, availa
           <CardDescription role="status">Loading questions…</CardDescription>
         ) : questions.length === 0 ? (
           <CardDescription>No questions in this round.</CardDescription>
-        ) : revealed ? (
+        ) : showAnswers ? (
           questions.map((item, index) => (
             <QuestionCard key={item.id} item={item} number={index + 1} reveal />
           ))
@@ -222,7 +240,7 @@ function HostOnlyRound({ round, roundNumber, roundCount, availableRounds, availa
                 Previous Question
               </Button>
               {lastQuestion ? (
-                <Button className="min-h-[44px]" onClick={() => { setRevealed(true); window.scrollTo(0, 0) }}>Reveal Answers</Button>
+                <Button className="min-h-[44px]" onClick={() => { onRevealAnswers(); setShowAnswers(true); window.scrollTo(0, 0) }}>Reveal Answers</Button>
               ) : (
                 <Button className="min-h-[44px]" onClick={() => {
                   onQuestionPresented(questionIndex + 2)
@@ -237,12 +255,13 @@ function HostOnlyRound({ round, roundNumber, roundCount, availableRounds, availa
   )
 }
 
-function NumberPicker({ label, current, total, available, onSelect }: {
+function NumberPicker({ label, current, total, available, onSelect, answers }: {
   label: 'Round' | 'Question'
   current: number
   total: number
   available: number
   onSelect: (number: number) => void
+  answers?: { revealed: boolean; showing: boolean; onSelect: () => void }
 }) {
   const [open, setOpen] = useState(false)
   const title = `Jump to ${label.toLowerCase()}`
@@ -258,13 +277,13 @@ function NumberPicker({ label, current, total, available, onSelect }: {
           <DialogHeader className="pr-6">
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>
-              Choose a previously presented {label.toLowerCase()}. The current number is highlighted.
+              Choose a previously presented {label.toLowerCase()}. The current selection is highlighted.
             </DialogDescription>
           </DialogHeader>
           <Card role="group" aria-label={`${label} numbers`} tabIndex={0} className="grid grid-cols-5 gap-2 p-1 min-h-0 max-h-[50dvh] overflow-y-auto border-0 shadow-none">
             {Array.from({ length: total }, (_, index) => {
               const number = index + 1
-              const selected = number === current
+              const selected = number === current && !answers?.showing
               return (
                 <Button
                   key={number}
@@ -278,6 +297,17 @@ function NumberPicker({ label, current, total, available, onSelect }: {
                 </Button>
               )
             })}
+            {answers && (
+              <Button
+                variant={answers.showing ? 'default' : 'outline'}
+                className={`col-span-5 min-h-[44px] ${answers.showing ? 'disabled:opacity-100' : ''}`}
+                disabled={!answers.revealed || answers.showing}
+                aria-current={answers.showing ? 'step' : undefined}
+                onClick={() => { setOpen(false); answers.onSelect() }}
+              >
+                Answers
+              </Button>
+            )}
           </Card>
         </DialogContent>
       </Dialog>{' '}
@@ -304,16 +334,20 @@ function QuestionCard({ item, number, reveal = false }: { item: HostQuestion; nu
         <CardTitle className="text-base md:text-xl leading-relaxed">{question.question}</CardTitle>
       </CardHeader>
       <CardContent className="px-3 md:px-4 space-y-2">
-        {answers.shuffledAnswers.map(answer => (
-          <Card key={answer.label} className="p-3 text-sm md:text-base shadow-none">
-            {answer.label}. {answer.text}
-          </Card>
-        ))}
-        {reveal && (
-          <Card className="p-3 font-semibold text-sm md:text-base bg-green-100 text-green-800 border-green-500 dark:bg-green-900 dark:text-green-200 dark:border-green-600">
-            Correct answer: {answers.correctAnswerLabel}. {question.answer_a}
-          </Card>
-        )}
+        {answers.shuffledAnswers.map(answer => {
+          const isCorrectAnswer = reveal && answer.label === answers.correctAnswerLabel
+          return (
+            <Card
+              key={answer.label}
+              className={`p-3 text-sm md:text-base shadow-none flex items-start justify-between gap-3 ${isCorrectAnswer
+                ? 'border-2 bg-green-100 border-green-500 text-green-800 dark:bg-green-900 dark:border-green-500 dark:text-green-200'
+                : ''}`}
+            >
+              {answer.label}. {answer.text}
+              {isCorrectAnswer && <Check role="img" aria-label="Correct answer" className="h-5 w-5 shrink-0 text-green-600 dark:text-green-400" />}
+            </Card>
+          )
+        })}
       </CardContent>
     </Card>
   )

@@ -60,6 +60,15 @@ async function setup(page: Page, mode?: string) {
   return updates
 }
 
+async function expectCorrectAnswer(page: Page, answer: string) {
+  const option = page.getByText(new RegExp(`^[ABCD]\\. ${answer}$`))
+  await expect(option).toHaveClass(/bg-green-100/)
+  await expect(option).toHaveClass(/border-green-500/)
+  await expect(option).toHaveClass(/dark:bg-green-900/)
+  await expect(option.getByRole('img', { name: 'Correct answer', exact: true })).toBeVisible()
+  await expect(page.getByText('Correct answer:', { exact: false })).toHaveCount(0)
+}
+
 async function selectMode(page: Page, name: 'Player' | 'Host Only') {
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await page.getByRole('menuitemradio', { name, exact: true }).click()
@@ -87,12 +96,14 @@ test('defaults to Player and remembers exactly one mode across games', async ({ 
   await expect(page.getByRole('menuitemradio', { name: 'Player', exact: true })).toBeChecked()
 })
 
-test('navigates questions without revealing answers, reviews each round, and completes the game', async ({ page }) => {
+test('navigates questions without revealing answers, reviews each round, and completes the game', async ({ page }, testInfo) => {
   const updates = await setup(page, 'host-only')
   await page.goto(`/controller/${gameId}`)
   await expect(page.getByText('Round 1 of 2', { exact: true })).toBeVisible()
   await expect(page.getByText('Question 1 of 3', { exact: true })).toBeVisible()
   await expect(page.getByText(questions[0].question, { exact: true })).toBeVisible()
+  await expect(page.getByRole('img', { name: 'Correct answer', exact: true })).toHaveCount(0)
+  await expect(page.getByText(/^[ABCD]\. Mars$/)).not.toHaveClass(/bg-green-100/)
   await expect(page.getByText('Correct answer:', { exact: false })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Previous Question' })).toBeDisabled()
   await expect(page.getByRole('button', { name: 'Reveal Answers', exact: true })).toHaveCount(0)
@@ -110,7 +121,8 @@ test('navigates questions without revealing answers, reviews each round, and com
   const picker = page.getByRole('dialog', { name: 'Jump to question', exact: true })
   await expect(picker.getByRole('button', { name: '1', exact: true })).toBeDisabled()
   await expect(picker.getByRole('button', { name: '1', exact: true })).toHaveAttribute('aria-current', 'step')
-  await expect(picker.getByRole('group', { name: 'Question numbers' }).getByRole('button')).toHaveCount(3)
+  await expect(picker.getByRole('group', { name: 'Question numbers' }).getByRole('button')).toHaveCount(4)
+  await expect(picker.getByRole('button', { name: 'Answers', exact: true })).toBeDisabled()
   await expect(picker.getByRole('button', { name: '3', exact: true })).toBeDisabled()
   await expect(picker.getByRole('button', { name: '2', exact: true })).toBeEnabled()
   await picker.getByRole('button', { name: '2', exact: true }).click()
@@ -123,15 +135,20 @@ test('navigates questions without revealing answers, reviews each round, and com
   await page.getByRole('button', { name: 'Reveal Answers', exact: true }).click()
   for (const question of questions.slice(0, 3)) {
     await expect(page.getByText(question.question, { exact: true })).toBeVisible()
-    await expect(page.getByText(new RegExp(`Correct answer: [ABCD]\\. ${question.answer_a}`))).toBeVisible()
+    await expectCorrectAnswer(page, question.answer_a)
   }
+  await expect(page.getByRole('img', { name: 'Correct answer', exact: true })).toHaveCount(3)
+  await expect(page.getByText(/^[ABCD]\. /)).toHaveCount(12)
+  await expect(page.getByText(/^[ABCD]\. Alternative B$/).first()).not.toHaveClass(/bg-green-100/)
+  await page.screenshot({ path: testInfo.outputPath('round-answers.png') })
   await page.getByRole('button', { name: 'Next Round', exact: true }).click()
   await expect(page.getByText('Round 2 of 2', { exact: true })).toBeVisible()
   await expect(page.getByText('Question 1 of 1', { exact: true })).toBeVisible()
   await expect(page.getByText(questions[3].question, { exact: true })).toBeVisible()
+  await expect(page.getByRole('img', { name: 'Correct answer', exact: true })).toHaveCount(0)
   await expect(page.getByText('Correct answer:', { exact: false })).toHaveCount(0)
   await page.getByRole('button', { name: 'Reveal Answers', exact: true }).click()
-  await expect(page.getByText(/Correct answer: [ABCD]\. George Washington/)).toBeVisible()
+  await expectCorrectAnswer(page, 'George Washington')
   const completed = page.waitForRequest(request => request.method() === 'PATCH' && request.postDataJSON()?.status === 'completed')
   await page.getByRole('button', { name: 'Game Complete', exact: true }).click()
   await completed
@@ -176,6 +193,51 @@ test('jumps between rounds and starts each selected round with hidden answers', 
   await expect(page.getByText('Correct answer:', { exact: false })).toHaveCount(0)
 })
 
+test('only lets the question picker revisit answers already revealed for that round', async ({ page }) => {
+  await setup(page, 'host-only')
+  await page.goto(`/controller/${gameId}`)
+  const picker = page.getByRole('dialog', { name: 'Jump to question', exact: true })
+  await page.getByRole('button', { name: 'Jump to question', exact: true }).click()
+  await expect(picker.getByRole('button', { name: 'Answers', exact: true })).toBeDisabled()
+  await expect(picker.getByRole('group').getByRole('button').last()).toHaveText('Answers')
+  await picker.getByRole('button', { name: 'Close', exact: true }).click()
+  await expect(picker).not.toBeVisible()
+  await page.getByRole('button', { name: 'Next Question', exact: true }).click()
+  await page.getByRole('button', { name: 'Next Question', exact: true }).click()
+  await page.getByRole('button', { name: 'Jump to question', exact: true }).click()
+  await expect(picker.getByRole('button', { name: 'Answers', exact: true })).toBeDisabled()
+  await picker.getByRole('button', { name: 'Close', exact: true }).click()
+  await expect(picker).not.toBeVisible()
+  await page.getByRole('button', { name: 'Reveal Answers', exact: true }).click()
+  await page.getByRole('button', { name: 'Jump to question', exact: true }).click()
+  await expect(picker.getByRole('button', { name: 'Answers', exact: true })).toBeDisabled()
+  await expect(picker.getByRole('button', { name: 'Answers', exact: true })).toHaveAttribute('aria-current', 'step')
+  // Even the last question can be revisited while the answer list is showing.
+  await expect(picker.getByRole('button', { name: '3', exact: true })).toBeEnabled()
+  await picker.getByRole('button', { name: '3', exact: true }).click()
+  await expect(page.getByText('Question 3 of 3', { exact: true })).toBeVisible()
+  await expect(page.getByRole('img', { name: 'Correct answer', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Jump to question', exact: true }).click()
+  await expect(picker.getByRole('button', { name: 'Answers', exact: true })).toBeEnabled()
+  await picker.getByRole('button', { name: 'Answers', exact: true }).click()
+  await expect(picker).not.toBeVisible()
+  await expect(page.getByText('Round Answers', { exact: true })).toBeVisible()
+  await expect(page.getByRole('img', { name: 'Correct answer', exact: true })).toHaveCount(3)
+  await page.getByRole('button', { name: 'Next Round', exact: true }).click()
+  await page.getByRole('button', { name: 'Jump to question', exact: true }).click()
+  await expect(picker.getByRole('button', { name: 'Answers', exact: true })).toBeDisabled()
+  await picker.getByRole('button', { name: 'Close', exact: true }).click()
+  await expect(picker).not.toBeVisible()
+  await page.getByRole('button', { name: 'Jump to round', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Jump to round', exact: true }).getByRole('button', { name: '1', exact: true }).click()
+  await expect(page.getByText('Question 1 of 3', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Jump to question', exact: true }).click()
+  await expect(picker.getByRole('button', { name: 'Answers', exact: true })).toBeEnabled()
+  await picker.getByRole('button', { name: 'Answers', exact: true }).click()
+  await expect(page.getByText('Round Answers', { exact: true })).toBeVisible()
+  await expectCorrectAnswer(page, 'Mars')
+})
+
 test('scrolls numbered question and round grids when there are many choices', async ({ page }, testInfo) => {
   await setup(page, 'host-only')
   const manyRounds = Array.from({ length: 80 }, (_, index) => ({
@@ -198,7 +260,7 @@ test('scrolls numbered question and round grids when there are many choices', as
     await page.getByRole('button', { name: `Jump to ${kind}`, exact: true }).click()
     const picker = page.getByRole('dialog', { name: `Jump to ${kind}`, exact: true })
     const grid = picker.getByRole('group')
-    await expect(grid.getByRole('button')).toHaveCount(count)
+    await expect(grid.getByRole('button')).toHaveCount(count + (kind === 'question' ? 1 : 0))
     await expect(grid.getByRole('button', { name: '1', exact: true })).toBeDisabled()
     expect(await grid.evaluate(element => element.scrollHeight > element.clientHeight)).toBeTruthy()
     const box = await picker.boundingBox()
@@ -211,6 +273,15 @@ test('scrolls numbered question and round grids when there are many choices', as
     await last.scrollIntoViewIfNeeded()
     await expect(last).toBeInViewport()
     await expect(last).toBeDisabled()
+    if (kind === 'question') {
+      const answers = grid.getByRole('button', { name: 'Answers', exact: true })
+      await answers.scrollIntoViewIfNeeded()
+      await expect(answers).toBeInViewport()
+      await expect(answers).toBeDisabled()
+      await expect(grid.getByRole('button').last()).toHaveText('Answers')
+    } else {
+      await expect(picker.getByRole('button', { name: 'Answers', exact: true })).toHaveCount(0)
+    }
     await page.keyboard.press('Escape')
     await expect(picker).not.toBeVisible()
   }
@@ -243,7 +314,7 @@ test('keeps the answer review available when completion fails', async ({ page })
   })
   await page.getByRole('button', { name: 'Game Complete', exact: true }).click()
   await expect(page.getByText('Unable to complete game. Please try again.', { exact: true })).toBeVisible()
-  await expect(page.getByText(/Correct answer: [ABCD]\. George Washington/)).toBeVisible()
+  await expectCorrectAnswer(page, 'George Washington')
   await expect(page.getByRole('button', { name: 'Game Complete', exact: true })).toBeEnabled()
   await expect(page).toHaveURL(new RegExp(`/controller/${gameId}$`))
 })
