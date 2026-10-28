@@ -22,6 +22,7 @@ import TeamCard from '@/components/games/TeamCard'
 import FloatingActionBar from '@/components/games/FloatingActionBar'
 import { getPublicUrl } from '@/lib/networkUrl'
 import OnlinePlayersPanel from '@/components/games/OnlinePlayersPanel'
+import HostOnlyController from '@/components/games/HostOnlyController'
 
 type GameState = 'game-start' | 'round-start' | 'round-play' | 'round-end' | 'game-end' | 'thanks' | 'return-to-lobby'
 
@@ -116,6 +117,15 @@ const createTimerForState = (state: GameState, isAnswerRevealed: boolean, metada
 
 export default function ControllerPage() {
   const { id } = useParams<{ id: string }>()
+  const settings = useControllerSettings()
+
+  return settings.playMode === 'host-only'
+    ? <HostOnlyController key={id} settings={settings} />
+    : <PlayerControllerPage key={id} settings={settings} />
+}
+
+function PlayerControllerPage({ settings }: { settings: ReturnType<typeof useControllerSettings> }) {
+  const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [game, setGame] = useState<Game | null>(null)
   const [rounds, setRounds] = useState<any[]>([])
@@ -131,11 +141,13 @@ export default function ControllerPage() {
 
   // Controller settings
   const {
+    playMode,
+    selectPlayMode,
     showQrCode,
     showJoinLink,
     toggleQrCode,
     toggleJoinLink
-  } = useControllerSettings()
+  } = settings
 
   // Calculate stats for stats line
   const teamCount = game?.scoreboard
@@ -985,6 +997,8 @@ export default function ControllerPage() {
       <ControllerHeader
         gameName={game?.name || 'Controller'}
         gameCode={game?.code || ''}
+        playMode={playMode}
+        onPlayModeChange={selectPlayMode}
         showQrCode={showQrCode}
         showJoinLink={showJoinLink}
         onToggleQrCode={toggleQrCode}

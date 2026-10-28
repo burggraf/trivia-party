@@ -4,12 +4,19 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
+import type { PlayMode } from '@/hooks/useControllerSettings'
 
 interface ControllerSettingsProps {
+  playMode: PlayMode
+  onPlayModeChange: (mode: PlayMode) => void
   showQrCode: boolean
   showJoinLink: boolean
   onToggleQrCode: () => void
@@ -17,6 +24,8 @@ interface ControllerSettingsProps {
 }
 
 export default function ControllerSettings({
+  playMode,
+  onPlayModeChange,
   showQrCode,
   showJoinLink,
   onToggleQrCode,
@@ -35,6 +44,14 @@ export default function ControllerSettings({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel>Play Mode</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={playMode} onValueChange={(value) => {
+          if (value === 'player' || value === 'host-only') onPlayModeChange(value)
+        }}>
+          <DropdownMenuRadioItem value="player" className="min-h-[44px]">Player</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="host-only" className="min-h-[44px]">Host Only</DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={(e) => {
             e.preventDefault()

@@ -1,14 +1,21 @@
 import { useState, useEffect } from 'react'
 
+export type PlayMode = 'player' | 'host-only'
+
 export interface ControllerSettings {
+  playMode: PlayMode
   showQrCode: boolean
   showJoinLink: boolean
 }
 
+const STORAGE_KEY_MODE = 'controller.playMode'
 const STORAGE_KEY_QR = 'controller.showQrCode'
 const STORAGE_KEY_LINK = 'controller.showJoinLink'
 
 export function useControllerSettings() {
+  const [playMode, setPlayMode] = useState<PlayMode>(() =>
+    localStorage.getItem(STORAGE_KEY_MODE) === 'host-only' ? 'host-only' : 'player'
+  )
   const [showQrCode, setShowQrCode] = useState(true)
   const [showJoinLink, setShowJoinLink] = useState(true)
 
@@ -37,7 +44,14 @@ export function useControllerSettings() {
     localStorage.setItem(STORAGE_KEY_LINK, String(newValue))
   }
 
+  const selectPlayMode = (mode: PlayMode) => {
+    setPlayMode(mode)
+    localStorage.setItem(STORAGE_KEY_MODE, mode)
+  }
+
   return {
+    playMode,
+    selectPlayMode,
     showQrCode,
     showJoinLink,
     toggleQrCode,

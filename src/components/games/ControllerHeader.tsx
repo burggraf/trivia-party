@@ -3,10 +3,13 @@ import { Button } from '@/components/ui/button'
 import AppHeader from '@/components/ui/AppHeader'
 import ThemeToggle from '@/components/ThemeToggle'
 import ControllerSettings from './ControllerSettings'
+import type { PlayMode } from '@/hooks/useControllerSettings'
 
 interface ControllerHeaderProps {
   gameName: string
   gameCode: string
+  playMode: PlayMode
+  onPlayModeChange: (mode: PlayMode) => void
   showQrCode: boolean
   showJoinLink: boolean
   onToggleQrCode: () => void
@@ -17,6 +20,8 @@ interface ControllerHeaderProps {
 export default function ControllerHeader({
   gameName,
   gameCode,
+  playMode,
+  onPlayModeChange,
   showQrCode,
   showJoinLink,
   onToggleQrCode,
@@ -28,9 +33,11 @@ export default function ControllerHeader({
       title={
         <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3">
           <span>{gameName}</span>
-          <span className="text-sm sm:text-base font-semibold tracking-widest text-slate-600 dark:text-slate-400">
-            Code: {gameCode}
-          </span>
+          {playMode === 'player' && (
+            <span className="text-sm sm:text-base font-semibold tracking-widest text-slate-600 dark:text-slate-400">
+              Code: {gameCode}
+            </span>
+          )}
         </div>
       }
       leftButton={
@@ -47,6 +54,8 @@ export default function ControllerHeader({
       rightButton={
         <>
           <ControllerSettings
+            playMode={playMode}
+            onPlayModeChange={onPlayModeChange}
             showQrCode={showQrCode}
             showJoinLink={showJoinLink}
             onToggleQrCode={onToggleQrCode}
