@@ -259,11 +259,48 @@ test('fits mobile, tablet, and desktop in light and dark mode', async ({ page },
     for (const width of [375, 640, 1024]) {
       await page.setViewportSize({ width, height: 800 })
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy()
+      const roundNumber = page.getByRole('button', { name: 'Jump to round', exact: true })
+      const questionNumber = page.getByRole('button', { name: 'Jump to question', exact: true })
+      const roundTotal = page.getByRole('button', { name: 'Total rounds', exact: true })
+      const questionTotal = page.getByRole('button', { name: 'Total questions', exact: true })
+      await expect(roundTotal).toBeDisabled()
+      await expect(roundTotal).toHaveText('2')
+      await expect(questionTotal).toBeDisabled()
+      await expect(questionTotal).toHaveText('3')
+      const counterBoxes = []
+      for (const control of [roundNumber, roundTotal, questionNumber, questionTotal]) {
+        const box = await control.boundingBox()
+        expect(box?.height).toBeGreaterThanOrEqual(44)
+        expect(box?.width).toBeGreaterThanOrEqual(44)
+        counterBoxes.push(box!)
+      }
+      expect(new Set(counterBoxes.map(box => box.y)).size).toBe(1)
+      expect(counterBoxes.map(box => box.x)).toEqual(counterBoxes.map(box => box.x).sort((a, b) => a - b))
+      await expect(page.getByText('Science', { exact: true })).toHaveCSS('text-align', 'center')
+      await expect(page.getByText('Round', { exact: true })).toBeVisible()
+      await expect(page.getByText('Question', { exact: true })).toBeVisible()
+      const title = (await page.getByText('Science', { exact: true }).boundingBox())!
+      const roundLabel = (await page.getByText('Round', { exact: true }).boundingBox())!
+      const questionLabel = (await page.getByText('Question', { exact: true }).boundingBox())!
+      expect(title.y + title.height).toBeLessThanOrEqual(roundLabel.y)
+      expect(roundLabel.y).toBe(questionLabel.y)
+      expect(roundLabel.y + roundLabel.height).toBeLessThanOrEqual(counterBoxes[0].y)
+      for (const [label, first, last] of [
+        [roundLabel, counterBoxes[0], counterBoxes[1]],
+        [questionLabel, counterBoxes[2], counterBoxes[3]],
+      ]) {
+        expect(Math.abs(label.x + label.width / 2 - (first.x + last.x + last.width) / 2)).toBeLessThan(1)
+      }
+      expect(Math.abs(title.x + title.width / 2 - (counterBoxes[0].x + counterBoxes[3].x + counterBoxes[3].width) / 2)).toBeLessThan(1)
+      await expect(roundNumber).toBeEnabled()
+      await expect(questionNumber).toBeEnabled()
+      expect(await roundNumber.evaluate(element => getComputedStyle(element).backgroundColor))
+        .not.toBe(await roundTotal.evaluate(element => getComputedStyle(element).backgroundColor))
+      expect(await questionNumber.evaluate(element => getComputedStyle(element).backgroundColor))
+        .not.toBe(await questionTotal.evaluate(element => getComputedStyle(element).backgroundColor))
       for (const control of [
         page.getByRole('button', { name: 'Next Question', exact: true }),
         page.getByRole('button', { name: 'Previous Question', exact: true }),
-        page.getByRole('button', { name: 'Jump to question', exact: true }),
-        page.getByRole('button', { name: 'Jump to round', exact: true }),
       ]) {
         expect((await control.boundingBox())?.height).toBeGreaterThanOrEqual(44)
       }

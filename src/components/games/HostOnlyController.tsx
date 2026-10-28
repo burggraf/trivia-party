@@ -177,10 +177,10 @@ function HostOnlyRound({ round, roundNumber, roundCount, availableRounds, availa
   return (
     <Card className="shadow-none">
       <CardHeader className="p-4 md:p-6">
-        <NumberPicker label="Round" current={roundNumber} total={roundCount} available={availableRounds} onSelect={onRoundChange} />
-        <CardTitle className="text-lg md:text-2xl break-words">{round.title}</CardTitle>
-        {questions && questions.length > 0 && (
-          revealed ? <CardDescription>Round Answers</CardDescription> : (
+        <CardTitle className="text-lg md:text-2xl break-words text-center">{round.title}</CardTitle>
+        <CardDescription className="grid grid-cols-2 gap-4">
+          <NumberPicker label="Round" current={roundNumber} total={roundCount} available={availableRounds} onSelect={onRoundChange} />
+          {!revealed && questions && questions.length > 0 && (
             <NumberPicker
               label="Question"
               current={questionIndex + 1}
@@ -188,8 +188,9 @@ function HostOnlyRound({ round, roundNumber, roundCount, availableRounds, availa
               available={availableQuestions}
               onSelect={number => { if (number <= availableQuestions) setQuestionIndex(number - 1) }}
             />
-          )
-        )}
+          )}
+        </CardDescription>
+        {revealed && <CardDescription className="text-center">Round Answers</CardDescription>}
       </CardHeader>
       <CardContent className="px-4 md:px-6 space-y-4 md:space-y-6">
         {error ? (
@@ -247,11 +248,11 @@ function NumberPicker({ label, current, total, available, onSelect }: {
   const title = `Jump to ${label.toLowerCase()}`
 
   return (
-    <CardDescription className="flex items-center gap-1" aria-live="polite">
-      {label}{' '}
+    <CardDescription className="grid grid-cols-[44px_auto_44px] justify-center items-center gap-x-2 gap-y-1 whitespace-nowrap" aria-live="polite">
+      <CardDescription className="col-span-3 text-center font-medium">{label}</CardDescription>{' '}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" className="h-11 min-w-[44px] px-2" aria-label={title}>{current}</Button>
+          <Button className="h-11 min-w-[44px] px-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700" aria-label={title}>{current}</Button>
         </DialogTrigger>
         <DialogContent className="w-[calc(100%-2rem)] max-w-sm max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden rounded-lg p-4 md:p-6">
           <DialogHeader className="pr-6">
@@ -280,7 +281,10 @@ function NumberPicker({ label, current, total, available, onSelect }: {
           </Card>
         </DialogContent>
       </Dialog>{' '}
-      of {total}
+      of{' '}
+      <Button variant="secondary" className="h-11 min-w-[44px] px-2 text-slate-500 dark:text-slate-400 disabled:opacity-100" disabled aria-label={`Total ${label.toLowerCase()}s`}>
+        {total}
+      </Button>
     </CardDescription>
   )
 }
