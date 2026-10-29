@@ -204,10 +204,17 @@ test('replacement prevents duplicate confirmation or dismissal while saving', as
 
 test('Host Only replacement updates the displayed question and its revealed answer', async ({ page }) => {
   const state = await setup(page)
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') })
+  await page.clock.pauseAt(new Date('2026-01-01T00:00:01Z'))
   await page.goto(`/controller/${gameId}`)
+  const timer = page.getByRole('timer', { name: 'Elapsed question time' })
+  await expect(timer).toHaveText('00:00')
+  await page.clock.fastForward(5000)
+  await expect(timer).toHaveText('00:05')
   await replaceButton(page).click()
   await dialog(page).getByRole('button', { name: 'Replace Question', exact: true }).click()
   await expect(page.getByText(replacement.question, { exact: true })).toBeVisible()
+  await expect(timer).toHaveText('00:00')
   await expect(page.getByRole('img', { name: 'Correct answer', exact: true })).toHaveCount(0)
   await expect(replaceButton(page)).toBeVisible()
   expect(state.records.filter(record => record.round === rounds[0].id)).toHaveLength(3)

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Check } from 'lucide-react'
+import { Check, Pause, Play, TimerReset } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -268,8 +268,51 @@ function HostOnlyRound({ round, roundNumber, roundCount, availableRounds, availa
               )}
             </>
           )}
+          {!showAnswers && question && <QuestionTimer key={question.id} />}
         </CardFooter>
       )}
+    </Card>
+  )
+}
+
+function QuestionTimer() {
+  const [elapsed, setElapsed] = useState(0)
+  const [startedAt, setStartedAt] = useState<number | null>(() => performance.now())
+  const [now, setNow] = useState(() => performance.now())
+
+  useEffect(() => {
+    if (startedAt === null) return
+    const interval = window.setInterval(() => setNow(performance.now()), 250)
+    return () => window.clearInterval(interval)
+  }, [startedAt])
+
+  const seconds = Math.floor((elapsed + (startedAt === null ? 0 : now - startedAt)) / 1000)
+
+  return (
+    <Card role="group" aria-label="Question timer controls" className="grid w-full grid-cols-3 items-center gap-3 rounded-none border-0 shadow-none">
+      <Button variant="outline" size="icon" className="h-11 w-11 justify-self-start" aria-label="Reset timer" onClick={() => {
+        const current = performance.now()
+        setElapsed(0)
+        setNow(current)
+        if (startedAt !== null) setStartedAt(current)
+      }}>
+        <TimerReset aria-hidden="true" className="h-4 w-4" />
+      </Button>
+      <CardDescription role="timer" aria-label="Elapsed question time" className="justify-self-center min-w-[5ch] font-mono text-lg md:text-xl font-semibold tabular-nums text-slate-800 dark:text-slate-100">
+        {String(Math.floor(seconds / 60)).padStart(2, '0')}:{String(seconds % 60).padStart(2, '0')}
+      </CardDescription>
+      <Button variant="outline" size="icon" className="h-11 w-11 justify-self-end" aria-label={startedAt === null ? 'Resume timer' : 'Pause timer'} onClick={() => {
+        const current = performance.now()
+        setNow(current)
+        if (startedAt === null) {
+          setStartedAt(current)
+        } else {
+          setElapsed(elapsed + current - startedAt)
+          setStartedAt(null)
+        }
+      }}>
+        {startedAt === null ? <Play aria-hidden="true" className="h-4 w-4" /> : <Pause aria-hidden="true" className="h-4 w-4" />}
+      </Button>
     </Card>
   )
 }
