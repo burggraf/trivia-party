@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
+import { Card, CardDescription, CardTitle } from '@/components/ui/card'
 import ThemeToggle from '@/components/ThemeToggle'
 import { Users, Zap, Settings, Sparkles, Play, Trophy } from 'lucide-react'
 import packageJson from '../../package.json'
@@ -126,7 +126,7 @@ export default function LandingPage() {
               <li className="flex items-start gap-3">
                 <Zap className="h-5 w-5 text-slate-500 dark:text-slate-400 mt-0.5 flex-shrink-0" />
                 <span className="text-slate-700 dark:text-slate-300">
-                  <strong className="font-semibold">60K+ Questions:</strong> Massive database across all categories
+                  <strong className="font-semibold">500k+ Questions:</strong> Massive database across all categories
                 </span>
               </li>
               <li className="flex items-start gap-3">
@@ -146,6 +146,12 @@ export default function LandingPage() {
                 <span className="text-slate-700 dark:text-slate-300">
                   <strong className="font-semibold">Live Management:</strong> Track scores and moderate in real-time
                 </span>
+              </li>
+              <li className="flex items-start gap-3">
+                <Zap aria-hidden="true" className="h-5 w-5 text-slate-500 dark:text-slate-400 mt-0.5 flex-shrink-0" />
+                <CardDescription className="text-base text-slate-700 dark:text-slate-300">
+                  <strong className="font-semibold">Host Only Mode:</strong> Host classic, manual trivia games at your own pace
+                </CardDescription>
               </li>
             </ul>
           </Card>
@@ -175,6 +181,14 @@ export default function LandingPage() {
                 Play solo or in teams with flexible round structures
               </p>
             </div>
+            <Card className="space-y-2 border-0 bg-transparent shadow-none dark:bg-transparent">
+              <CardTitle className="text-base leading-6 tracking-normal text-slate-800 dark:text-slate-100">
+                Host Only Mode
+              </CardTitle>
+              <CardDescription className="text-slate-600 dark:text-slate-400">
+                Present questions one at a time and reveal each round's answers when you're ready.
+              </CardDescription>
+            </Card>
             <div className="space-y-2">
               <div className="font-semibold text-slate-800 dark:text-slate-100">
                 Mobile Friendly
