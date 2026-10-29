@@ -237,8 +237,12 @@ test('navigates questions without revealing answers, reviews each round, and com
   await expect(page.getByRole('img', { name: 'Correct answer', exact: true })).toHaveCount(3)
   await expect(page.getByText(/^[ABCD]\. /)).toHaveCount(12)
   await expect(page.getByText(/^[ABCD]\. Alternative B$/).first()).not.toHaveClass(/bg-green-100/)
+  const nextRound = page.getByRole('button', { name: 'Next Round', exact: true })
+  const nextRoundBox = (await nextRound.boundingBox())!
+  const footerBox = (await nextRound.locator('..').boundingBox())!
+  expect(Math.abs(nextRoundBox.x + nextRoundBox.width / 2 - footerBox.x - footerBox.width / 2)).toBeLessThan(1)
   await page.screenshot({ path: testInfo.outputPath('round-answers.png') })
-  await page.getByRole('button', { name: 'Next Round', exact: true }).click()
+  await nextRound.click()
   await expect(page.getByText('Round 2 of 2', { exact: true })).toBeVisible()
   await expect(page.getByText('Question 1 of 1', { exact: true })).toBeVisible()
   await expect(page.getByText(questions[3].question, { exact: true })).toBeVisible()

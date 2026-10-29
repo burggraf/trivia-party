@@ -249,7 +249,7 @@ function HostOnlyRound({ round, roundNumber, roundCount, availableRounds, availa
       {!error && questions && (
         <CardFooter className="px-4 md:px-6 flex flex-wrap gap-3 justify-between">
           {canAdvanceRound ? (
-            <Button className="min-h-[44px]" disabled={closing} onClick={roundNumber < roundCount ? onNextRound : onComplete}>
+            <Button className="min-h-[44px] mx-auto" disabled={closing} onClick={roundNumber < roundCount ? onNextRound : onComplete}>
               {roundNumber < roundCount ? 'Next Round' : closing ? 'Closing…' : 'Game Complete'}
             </Button>
           ) : (
