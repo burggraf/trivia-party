@@ -70,5 +70,8 @@ export default defineConfig({
     // Listen on all network interfaces to allow network access
     host: '0.0.0.0',
     port: 5173,
+    proxy: {
+      '/api': `http://127.0.0.1:${process.env.TRIVIA_POCKETBASE_PORT || '8090'}`,
+    },
   }
 })

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardDescription } from '@/components/ui/card'
@@ -6,11 +6,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { gameQuestionsService, type GameQuestion } from '@/lib/gameQuestions'
 import { questionsService, type Question } from '@/lib/questions'
 
-export default function ReplaceQuestionButton({ gameQuestion, question, onReplaced }: {
+export default function ReplaceQuestionButton({ gameQuestion, question, onReplaced, onReplacedFocus }: {
   gameQuestion: GameQuestion
   question: Question
   onReplaced: (record: GameQuestion, question: Question) => void
+  onReplacedFocus?: () => void
 }) {
+  const replaced = useRef(false)
   const [open, setOpen] = useState(false)
   const [levels, setLevels] = useState<number[]>([])
   const [selected, setSelected] = useState<number[]>([])
@@ -50,6 +52,7 @@ export default function ReplaceQuestionButton({ gameQuestion, question, onReplac
     setError('')
     try {
       const result = await gameQuestionsService.replaceGameQuestion(gameQuestion, selected)
+      replaced.current = true
       setOpen(false)
       onReplaced(result.record, result.question)
     } catch (error) {
@@ -66,7 +69,17 @@ export default function ReplaceQuestionButton({ gameQuestion, question, onReplac
           <RotateCcw className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="w-[calc(100%-2rem)] max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-lg p-4 md:p-6" aria-busy={replacing}>
+      <DialogContent
+        className="w-[calc(100%-2rem)] max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-lg p-4 md:p-6"
+        aria-busy={replacing}
+        onCloseAutoFocus={event => {
+          if (replaced.current && onReplacedFocus) {
+            event.preventDefault()
+            onReplacedFocus()
+          }
+          replaced.current = false
+        }}
+      >
         <DialogHeader className="pr-6">
           <DialogTitle>Replace question?</DialogTitle>
           <DialogDescription>Select one or more difficulty levels. A new question will be chosen randomly from those levels.</DialogDescription>

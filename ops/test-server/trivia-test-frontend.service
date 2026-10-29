@@ -1,0 +1,15 @@
+[Unit]
+Description=Trivia Party test frontend (Tailscale only)
+Requires=trivia-test-pocketbase.service
+After=trivia-test-pocketbase.service tailscaled.service
+PartOf=trivia-test.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/dev/trivia-party
+Environment=PATH=/root/.local/share/pi-node/current/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=/etc/trivia-party-test.env
+ExecStart=/root/.local/share/pi-node/current/bin/pnpm exec vite --host=${TRIVIA_TEST_HOST} --port=${TRIVIA_TEST_PORT} --strictPort
+Restart=on-failure
+RestartSec=3
+UMask=0077

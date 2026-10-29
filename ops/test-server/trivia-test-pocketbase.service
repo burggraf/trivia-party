@@ -1,0 +1,13 @@
+[Unit]
+Description=Trivia Party test PocketBase (private loopback)
+PartOf=trivia-test.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/dev/trivia-party
+EnvironmentFile=/etc/trivia-party-test.env
+ExecStartPre=/usr/bin/test -s /root/dev/trivia-party/pb_data/data.db
+ExecStart=/root/.local/share/trivia-party/pocketbase-0.40.5/pocketbase serve --http=127.0.0.1:${TRIVIA_POCKETBASE_PORT} --dir=/root/dev/trivia-party/pb_data --migrationsDir=/root/dev/trivia-party/pb_migrations --hooksDir=/root/dev/trivia-party/pb_hooks
+Restart=on-failure
+RestartSec=3
+UMask=0077

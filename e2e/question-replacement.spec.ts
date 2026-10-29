@@ -98,7 +98,7 @@ async function openGamesQuestions(page: Page) {
   await page.locator('[data-radix-collection-item][aria-controls]').first().click()
   await expect(page.getByText('Science', { exact: true })).toBeVisible()
   await page.locator('[data-radix-collection-item][aria-controls]').nth(1).click()
-  await expect(page.getByText(questions[0].question, { exact: true })).toBeVisible()
+  await expect(page.getByText(questions[0].question, { exact: true }).first()).toBeVisible()
 }
 
 const replaceButton = (page: Page) => page.getByRole('button', { name: 'Replace with a new question', exact: true })
@@ -157,6 +157,33 @@ test('games replacement requires confirmation, defaults to the current level, an
   expect(state.randomFilters[0]).toContain(questions[0].id)
   expect(state.records.filter(record => record.round === rounds[0].id)).toHaveLength(3)
   expect(state.records.find(record => record.id === 'replacejoin000')?.round).toBe('')
+})
+
+test('Games replacement focuses the new question without collapsing the list', async ({ page }) => {
+  const state = await setup(page)
+  // A long round makes losing the scroll position visible on both desktop and phones.
+  state.records = Array.from({ length: 30 }, (_, index) => ({
+    ...state.records[0], id: `scrolljoin${index}`, sequence: index + 1,
+    question: questions[index % 3].id,
+  }))
+  await openGamesQuestions(page)
+  const button = replaceButton(page).nth(14)
+  await button.scrollIntoViewIfNeeded()
+  await button.click()
+  await dialog(page).getByRole('button', { name: 'Replace Question', exact: true }).click()
+  await expect(dialog(page)).not.toBeVisible()
+  const card = page.getByText(replacement.question, { exact: true }).locator('../..')
+  await expect(card).toBeFocused()
+  await expect.poll(async () => (await card.boundingBox())?.y).toBeGreaterThanOrEqual(0)
+  await expect.poll(async () => (await card.boundingBox())?.y).toBeLessThan(40)
+  await expect(replaceButton(page)).toHaveCount(30)
+  await expect(card).toContainText('Q15')
+  await expect(card).toContainText('Replacement answer')
+  // Cancellation should still return focus to the recycle button, not the card.
+  const newButton = card.getByRole('button', { name: 'Replace with a new question', exact: true })
+  await newButton.click()
+  await dialog(page).getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(newButton).toBeFocused()
 })
 
 test('level zero is displayed and preselected using the actual question-bank range', async ({ page }) => {

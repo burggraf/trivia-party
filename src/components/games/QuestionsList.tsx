@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { gameQuestionsService, type GameQuestion } from '@/lib/gameQuestions'
 import { questionsService, type Question } from '@/lib/questions'
 import { getShuffledAnswers } from '@/lib/answerShuffler'
@@ -13,6 +13,7 @@ export default function QuestionsList({ roundId, roundTitle }: QuestionsListProp
   const [roundQuestions, setRoundQuestions] = useState<GameQuestion[]>([])
   const [questions, setQuestions] = useState<Question[]>([])
   const [loading, setLoading] = useState(true)
+  const questionCards = useRef(new Map<number, HTMLDivElement>())
 
   const fetchQuestions = useCallback(async () => {
     if (!roundId) {
@@ -92,7 +93,12 @@ export default function QuestionsList({ roundId, roundTitle }: QuestionsListProp
           <div className="space-y-2">
             {questionsWithDetails.map((roundQuestion) => (
               <div
-                key={roundQuestion.id}
+                key={roundQuestion.sequence}
+                ref={element => {
+                  if (element) questionCards.current.set(roundQuestion.sequence, element)
+                  else questionCards.current.delete(roundQuestion.sequence)
+                }}
+                tabIndex={-1}
                 className="flex items-start justify-between p-3 bg-[#fafafa] dark:bg-slate-800 rounded-md border border-[#e5e5e5] dark:border-slate-700 hover:bg-white dark:hover:bg-slate-750 transition-colors"
               >
                 <div className="flex-1">
@@ -150,7 +156,20 @@ export default function QuestionsList({ roundId, roundTitle }: QuestionsListProp
                   })()}
                 </div>
                 {roundQuestion.questionDetails && (
-                  <ReplaceQuestionButton gameQuestion={roundQuestion} question={roundQuestion.questionDetails} onReplaced={() => void fetchQuestions()} />
+                  <ReplaceQuestionButton
+                    gameQuestion={roundQuestion}
+                    question={roundQuestion.questionDetails}
+                    onReplaced={(record, replacement) => {
+                      // Keep the list mounted so closing the dialog cannot collapse the page.
+                      setRoundQuestions(previous => previous.map(item => item.id === roundQuestion.id ? record : item))
+                      setQuestions(previous => [...previous.filter(item => item.id !== replacement.id), replacement])
+                    }}
+                    onReplacedFocus={() => {
+                      const card = questionCards.current.get(roundQuestion.sequence)
+                      card?.focus({ preventScroll: true })
+                      card?.scrollIntoView({ block: 'start' })
+                    }}
+                  />
                 )}
               </div>
             ))}

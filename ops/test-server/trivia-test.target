@@ -1,0 +1,4 @@
+[Unit]
+Description=Trivia Party private test environment
+Requires=trivia-test-pocketbase.service trivia-test-frontend.service
+After=trivia-test-pocketbase.service trivia-test-frontend.service
