@@ -424,9 +424,9 @@ export default function HostPage() {
           </Button>
         }
       />
-      <div className="max-w-[1200px] mx-auto p-12">
+      <div className="max-w-[1200px] mx-auto px-0 py-4 md:p-12">
 
-        <div className="bg-white dark:bg-slate-900 border border-[#e5e5e5] dark:border-slate-800 rounded-lg overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 border-0 md:border border-[#e5e5e5] dark:border-slate-800 rounded-none md:rounded-lg overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-[#e5e5e5] dark:border-slate-800">
               <h2 className="text-[15px] font-semibold tracking-tight text-[#0a0a0a] dark:text-white">Games</h2>
               <Button

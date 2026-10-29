@@ -351,6 +351,17 @@ test('fits mobile, tablet, and desktop in light and dark mode', async ({ page },
     for (const width of [375, 640, 1024]) {
       await page.setViewportSize({ width, height: 800 })
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy()
+      const outerFrame = page.getByText('Science', { exact: true }).locator('../..')
+      await expect(outerFrame).toHaveCSS('border-left-width', width < 768 ? '0px' : '1px')
+      const frameBox = (await outerFrame.boundingBox())!
+      const headerBox = (await page.getByRole('banner').boundingBox())!
+      expect(Math.abs(frameBox.y - headerBox.y - headerBox.height)).toBeLessThan(1)
+      await expect(outerFrame.locator('..')).toHaveCSS('padding-top', '0px')
+      await expect(outerFrame.locator('..')).toHaveCSS('padding-bottom', '0px')
+      if (width < 768) {
+        expect(frameBox.x).toBe(0)
+        expect(frameBox.width).toBe(width)
+      }
       const roundNumber = page.getByRole('button', { name: 'Jump to round', exact: true })
       const questionNumber = page.getByRole('button', { name: 'Jump to question', exact: true })
       const roundTotal = page.getByRole('button', { name: 'Total rounds', exact: true })

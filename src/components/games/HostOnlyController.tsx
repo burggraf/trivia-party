@@ -90,7 +90,7 @@ export default function HostOnlyController({ settings }: { settings: ReturnType<
         onToggleJoinLink={settings.toggleJoinLink}
         onBack={() => navigate('/host')}
       />
-      <CardContent className="max-w-3xl mx-auto p-4 md:p-6 lg:p-8">
+      <CardContent className="max-w-3xl mx-auto p-0 md:px-6 lg:px-8">
         {error ? (
           <Card role="alert">
             <CardHeader><CardDescription>{error}</CardDescription></CardHeader>
@@ -188,7 +188,7 @@ function HostOnlyRound({ round, roundNumber, roundCount, availableRounds, availa
   const canAdvanceRound = showAnswers || questions?.length === 0
 
   return (
-    <Card className="shadow-none">
+    <Card className="rounded-none border-0 shadow-none md:rounded-lg md:border">
       <CardHeader className="p-4 md:p-6">
         <CardTitle className="text-lg md:text-2xl break-words text-center">{round.title}</CardTitle>
         <CardDescription className="grid grid-cols-2 gap-4">

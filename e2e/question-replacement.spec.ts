@@ -104,6 +104,27 @@ async function openGamesQuestions(page: Page) {
 const replaceButton = (page: Page) => page.getByRole('button', { name: 'Replace with a new question', exact: true })
 const dialog = (page: Page) => page.getByRole('dialog', { name: 'Replace question?', exact: true })
 
+test('Games uses edge-to-edge outer content on phones while retaining the desktop frame', async ({ page }, testInfo) => {
+  await setup(page)
+  await openGamesQuestions(page)
+  const frame = page.getByRole('heading', { name: 'Games', exact: true }).locator('../..')
+  for (const theme of ['Light', 'Dark']) {
+    await page.getByRole('button', { name: /Current theme:/ }).click()
+    await page.getByRole('menuitem', { name: theme, exact: true }).click()
+    for (const width of [375, 390, 430, 1024]) {
+      await page.setViewportSize({ width, height: 800 })
+      await expect(frame).toHaveCSS('border-left-width', width < 768 ? '0px' : '1px')
+      await expect(frame.locator('..')).toHaveCSS('padding-left', width < 768 ? '0px' : '48px')
+      if (width < 768) {
+        const box = (await frame.boundingBox())!
+        expect(box.x).toBe(0)
+        expect(box.width).toBe(width)
+      }
+      if (width === 375) await page.screenshot({ path: testInfo.outputPath(`games-${theme.toLowerCase()}.png`), fullPage: true })
+    }
+  }
+})
+
 test('games replacement requires confirmation, defaults to the current level, and supports nonconsecutive levels', async ({ page }, testInfo) => {
   const state = await setup(page)
   await openGamesQuestions(page)
