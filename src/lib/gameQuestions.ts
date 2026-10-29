@@ -1,4 +1,5 @@
 import pb from './pocketbase';
+import { questionsService, type Question } from './questions';
 
 export interface GameQuestion {
   id: string;
@@ -35,6 +36,29 @@ export const gameQuestionsService = {
       console.error('Failed to fetch game questions:', error);
       return [];
     }
+  },
+
+  async replaceGameQuestion(current: GameQuestion, levels: number[]): Promise<{ record: GameQuestion; question: Question }> {
+    if (current.host !== pb.authStore.record?.id || !current.game || !current.round || current.sequence < 1) {
+      throw new Error('This question cannot be replaced.');
+    }
+    const question = await questionsService.getReplacementQuestion(current.question, levels);
+    // Create first so a failed request never removes the original question.
+    const record = await this.createGameQuestion({
+      host: current.host, game: current.game, round: current.round,
+      question: question.id, sequence: current.sequence, category_name: question.category,
+    });
+    try {
+      await this.updateGameQuestion(current.id, { game: null, round: null, sequence: 0 });
+    } catch {
+      try {
+        await pb.collection('game_questions').delete(record.id);
+      } catch {
+        throw new Error('Unable to undo the incomplete replacement. Reload the game before making further changes.');
+      }
+      throw new Error('Unable to replace question. Please try again.');
+    }
+    return { record, question };
   },
 
   async createGameQuestion(data: CreateGameQuestionData): Promise<GameQuestion> {

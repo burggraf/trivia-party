@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import ControllerHeader from './ControllerHeader'
+import ReplaceQuestionButton from './ReplaceQuestionButton'
 import type { useControllerSettings } from '@/hooks/useControllerSettings'
 import pb from '@/lib/pocketbase'
 import { gamesService } from '@/lib/games'
@@ -18,7 +19,7 @@ import type { Game } from '@/types/games'
 import type { Round } from '@/types/rounds'
 
 type RoundQuestion = GameQuestion & { expand?: { question: Question } }
-type HostQuestion = { id: string; question: Question; answers: ReturnType<typeof getShuffledAnswers> }
+type HostQuestion = { id: string; record: GameQuestion; question: Question; answers: ReturnType<typeof getShuffledAnswers> }
 
 export default function HostOnlyController({ settings }: { settings: ReturnType<typeof useControllerSettings> }) {
   const { id } = useParams<{ id: string }>()
@@ -29,6 +30,7 @@ export default function HostOnlyController({ settings }: { settings: ReturnType<
   const [lastRoundIndex, setLastRoundIndex] = useState(0)
   const [presentedQuestions, setPresentedQuestions] = useState<Record<string, number>>({})
   const [revealedRounds, setRevealedRounds] = useState<Record<string, boolean>>({})
+  const [lockedQuestions, setLockedQuestions] = useState<Set<string>>(() => new Set())
   const [error, setError] = useState('')
   const [retry, setRetry] = useState(0)
   const [closing, setClosing] = useState(false)
@@ -105,6 +107,8 @@ export default function HostOnlyController({ settings }: { settings: ReturnType<
             availableRounds={lastRoundIndex + 1}
             availableQuestions={presentedQuestions[round.id] ?? 1}
             answersRevealed={revealedRounds[round.id] ?? false}
+            canReplaceQuestion={number => !lockedQuestions.has(`${round.id}:${number}`)}
+            onQuestionLeft={number => setLockedQuestions(previous => new Set(previous).add(`${round.id}:${number}`))}
             onRevealAnswers={() => setRevealedRounds(previous => ({ ...previous, [round.id]: true }))}
             onQuestionPresented={number => setPresentedQuestions(previous => ({
               ...previous, [round.id]: Math.max(previous[round.id] ?? 1, number),
@@ -125,13 +129,15 @@ export default function HostOnlyController({ settings }: { settings: ReturnType<
   )
 }
 
-function HostOnlyRound({ round, roundNumber, roundCount, availableRounds, availableQuestions, answersRevealed, onRevealAnswers, onQuestionPresented, onRoundChange, onNextRound, onComplete, closing }: {
+function HostOnlyRound({ round, roundNumber, roundCount, availableRounds, availableQuestions, answersRevealed, canReplaceQuestion, onQuestionLeft, onRevealAnswers, onQuestionPresented, onRoundChange, onNextRound, onComplete, closing }: {
   round: Round
   roundNumber: number
   roundCount: number
   availableRounds: number
   availableQuestions: number
   answersRevealed: boolean
+  canReplaceQuestion: (number: number) => boolean
+  onQuestionLeft: (number: number) => void
   onRevealAnswers: () => void
   onQuestionPresented: (number: number) => void
   onRoundChange: (number: number) => void
@@ -163,6 +169,7 @@ function HostOnlyRound({ round, roundNumber, roundCount, availableRounds, availa
           if (!question) throw new Error('Question is missing or inaccessible')
           return {
             id: record.id,
+            record,
             question,
             answers: getShuffledAnswers(record.key, question.answer_a, question.answer_b, question.answer_c, question.answer_d),
           }
@@ -185,7 +192,10 @@ function HostOnlyRound({ round, roundNumber, roundCount, availableRounds, availa
       <CardHeader className="p-4 md:p-6">
         <CardTitle className="text-lg md:text-2xl break-words text-center">{round.title}</CardTitle>
         <CardDescription className="grid grid-cols-2 gap-4">
-          <NumberPicker label="Round" current={roundNumber} total={roundCount} available={availableRounds} onSelect={onRoundChange} />
+          <NumberPicker label="Round" current={roundNumber} total={roundCount} available={availableRounds} onSelect={number => {
+            onQuestionLeft(questionIndex + 1)
+            onRoundChange(number)
+          }} />
           {questions && questions.length > 0 && (
             <NumberPicker
               label="Question"
@@ -194,6 +204,7 @@ function HostOnlyRound({ round, roundNumber, roundCount, availableRounds, availa
               available={availableQuestions}
               onSelect={number => {
                 if (number <= availableQuestions) {
+                  onQuestionLeft(questionIndex + 1)
                   setShowAnswers(false)
                   setQuestionIndex(number - 1)
                 }
@@ -225,7 +236,14 @@ function HostOnlyRound({ round, roundNumber, roundCount, availableRounds, availa
             <QuestionCard key={item.id} item={item} number={index + 1} reveal />
           ))
         ) : question && (
-          <QuestionCard item={question} />
+          <QuestionCard item={question} onReplaced={!answersRevealed && canReplaceQuestion(questionIndex + 1) ? (record, replacement) => {
+            setQuestions(previous => previous?.map(item => item.id === question.id ? {
+              id: record.id,
+              record,
+              question: replacement,
+              answers: getShuffledAnswers(record.key, replacement.answer_a, replacement.answer_b, replacement.answer_c, replacement.answer_d),
+            } : item) ?? null)
+          } : undefined} />
         )}
       </CardContent>
       {!error && questions && (
@@ -236,13 +254,14 @@ function HostOnlyRound({ round, roundNumber, roundCount, availableRounds, availa
             </Button>
           ) : (
             <>
-              <Button variant="outline" className="min-h-[44px]" disabled={questionIndex === 0} onClick={() => setQuestionIndex(index => index - 1)}>
+              <Button variant="outline" className="min-h-[44px]" disabled={questionIndex === 0} onClick={() => { onQuestionLeft(questionIndex + 1); setQuestionIndex(index => index - 1) }}>
                 Previous Question
               </Button>
               {lastQuestion ? (
-                <Button className="min-h-[44px]" onClick={() => { onRevealAnswers(); setShowAnswers(true); window.scrollTo(0, 0) }}>Reveal Answers</Button>
+                <Button className="min-h-[44px]" onClick={() => { onQuestionLeft(questionIndex + 1); onRevealAnswers(); setShowAnswers(true); window.scrollTo(0, 0) }}>Reveal Answers</Button>
               ) : (
                 <Button className="min-h-[44px]" onClick={() => {
+                  onQuestionLeft(questionIndex + 1)
                   onQuestionPresented(questionIndex + 2)
                   setQuestionIndex(index => index + 1)
                 }}>Next Question</Button>
@@ -319,17 +338,28 @@ function NumberPicker({ label, current, total, available, onSelect, answers }: {
   )
 }
 
-function QuestionCard({ item, number, reveal = false }: { item: HostQuestion; number?: number; reveal?: boolean }) {
+function QuestionCard({ item, number, reveal = false, onReplaced }: {
+  item: HostQuestion
+  number?: number
+  reveal?: boolean
+  onReplaced?: (record: GameQuestion, question: Question) => void
+}) {
   const { question, answers } = item
   return (
     <Card className="shadow-none break-words">
       <CardHeader className="p-3 md:p-4 space-y-3">
         {number && <CardDescription>Question {number}</CardDescription>}
-        <CardDescription className="flex flex-wrap gap-2">
+        <CardDescription className="flex flex-wrap items-center gap-2 [&>button]:ml-auto">
           <Badge variant="secondary">{question.category}</Badge>
           {question.subcategory && <Badge variant="secondary">{question.subcategory}</Badge>}
-          <Badge variant="outline" className="capitalize">{question.difficulty}</Badge>
-          {question.level && <Badge variant="outline">Level {question.level}</Badge>}
+          <Badge variant="outline" className={`text-[11px] px-2 rounded capitalize ${
+            question.difficulty === 'easy' ? 'bg-[#ecfdf5] dark:bg-emerald-950/40 text-[#065f46] dark:text-emerald-400 border-[#d1fae5] dark:border-emerald-900/50' :
+            question.difficulty === 'medium' ? 'bg-[#fef3c7] dark:bg-yellow-950/40 text-[#92400e] dark:text-yellow-400 border-[#fde68a] dark:border-yellow-900/50' :
+            'bg-[#fee2e2] dark:bg-red-950/40 text-[#991b1b] dark:text-red-400 border-[#fecaca] dark:border-red-900/50'
+          }`}>
+            {question.difficulty}{question.level != null && question.level !== '' ? ` ${question.level}` : ''}
+          </Badge>
+          {onReplaced && <ReplaceQuestionButton gameQuestion={item.record} question={question} onReplaced={onReplaced} />}
         </CardDescription>
         <CardTitle className="text-base md:text-xl leading-relaxed">{question.question}</CardTitle>
       </CardHeader>

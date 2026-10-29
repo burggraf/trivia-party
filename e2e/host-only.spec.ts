@@ -7,12 +7,12 @@ const rounds = [
   { id: 'hostonlyround02', title: 'History', sequence_number: 2, question_count: 1 },
 ].map(round => ({ ...round, host: hostId, game: gameId }))
 const questions = [
-  { id: 'hostonlyquest01', question: 'Which planet is known as the Red Planet?', answer_a: 'Mars' },
-  { id: 'hostonlyquest02', question: 'Which gas do plants absorb?', answer_a: 'Carbon dioxide' },
-  { id: 'hostonlyquest03', question: 'What is the largest ocean?', answer_a: 'Pacific' },
-  { id: 'hostonlyquest04', question: 'Who was the first US president?', answer_a: 'George Washington' },
+  { id: 'hostonlyquest01', question: 'Which planet is known as the Red Planet?', answer_a: 'Mars', difficulty: 'easy', level: '2' },
+  { id: 'hostonlyquest02', question: 'Which gas do plants absorb?', answer_a: 'Carbon dioxide', difficulty: 'medium', level: '5' },
+  { id: 'hostonlyquest03', question: 'What is the largest ocean?', answer_a: 'Pacific', difficulty: 'hard', level: '8' },
+  { id: 'hostonlyquest04', question: 'Who was the first US president?', answer_a: 'George Washington', difficulty: 'easy', level: '2' },
 ].map(question => ({
-  ...question, category: 'General knowledge', subcategory: 'Trivia', difficulty: 'easy', level: '2',
+  ...question, category: 'General knowledge', subcategory: 'Trivia',
   answer_b: 'Alternative B', answer_c: 'Alternative C', answer_d: 'Alternative D',
 }))
 
@@ -94,6 +94,27 @@ test('defaults to Player and remembers exactly one mode across games', async ({ 
   await page.reload()
   await page.getByRole('button', { name: 'Settings', exact: true }).click()
   await expect(page.getByRole('menuitemradio', { name: 'Player', exact: true })).toBeChecked()
+})
+
+test('combines difficulty and level into setup-style colored tags', async ({ page }) => {
+  await setup(page, 'host-only')
+  await page.goto(`/controller/${gameId}`)
+  const cases = [
+    { text: 'easy 2', level: 2, background: 'bg-[#ecfdf5]', dark: 'dark:bg-emerald-950/40' },
+    { text: 'medium 5', level: 5, background: 'bg-[#fef3c7]', dark: 'dark:bg-yellow-950/40' },
+    { text: 'hard 8', level: 8, background: 'bg-[#fee2e2]', dark: 'dark:bg-red-950/40' },
+  ]
+  for (const [index, item] of cases.entries()) {
+    const tag = page.getByText(item.text, { exact: true })
+    await expect(tag).toBeVisible()
+    await expect(tag).toHaveClass(new RegExp(item.background.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+    await expect(tag).toHaveClass(new RegExp(item.dark))
+    await expect(tag).toHaveCSS('text-transform', 'capitalize')
+    await expect(page.getByText(`Level ${item.level}`, { exact: true })).toHaveCount(0)
+    if (index < cases.length - 1) await page.getByRole('button', { name: 'Next Question', exact: true }).click()
+  }
+  await page.getByRole('button', { name: 'Reveal Answers', exact: true }).click()
+  for (const item of cases) await expect(page.getByText(item.text, { exact: true })).toBeVisible()
 })
 
 test('navigates questions without revealing answers, reviews each round, and completes the game', async ({ page }, testInfo) => {
@@ -375,6 +396,11 @@ test('fits mobile, tablet, and desktop in light and dark mode', async ({ page },
       ]) {
         expect((await control.boundingBox())?.height).toBeGreaterThanOrEqual(44)
       }
+      const recycle = page.getByRole('button', { name: 'Replace with a new question', exact: true })
+      await expect(recycle).toBeVisible()
+      const recycleBox = (await recycle.boundingBox())!
+      const metadataRight = await page.getByText('easy 2', { exact: true }).evaluate(element => element.parentElement!.getBoundingClientRect().right)
+      expect(Math.abs(recycleBox.x + recycleBox.width - metadataRight)).toBeLessThan(1)
       if (width === 375) {
         await page.screenshot({ path: testInfo.outputPath(`host-only-${theme.toLowerCase()}.png`), fullPage: true })
       }

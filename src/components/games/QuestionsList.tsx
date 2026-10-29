@@ -1,10 +1,8 @@
-import { useState, useEffect } from 'react'
-import { gameQuestionsService } from '@/lib/gameQuestions'
-import { questionsService } from '@/lib/questions'
-import { roundsService } from '@/lib/rounds'
+import { useState, useEffect, useCallback } from 'react'
+import { gameQuestionsService, type GameQuestion } from '@/lib/gameQuestions'
+import { questionsService, type Question } from '@/lib/questions'
 import { getShuffledAnswers } from '@/lib/answerShuffler'
-import { Question } from '@/lib/questions'
-import { RotateCcw } from 'lucide-react'
+import ReplaceQuestionButton from './ReplaceQuestionButton'
 
 interface QuestionsListProps {
   roundId?: string
@@ -12,144 +10,36 @@ interface QuestionsListProps {
 }
 
 export default function QuestionsList({ roundId, roundTitle }: QuestionsListProps) {
-  const [roundQuestions, setRoundQuestions] = useState<any[]>([])
+  const [roundQuestions, setRoundQuestions] = useState<GameQuestion[]>([])
   const [questions, setQuestions] = useState<Question[]>([])
   const [loading, setLoading] = useState(true)
-  const [recyclingQuestionId, setRecyclingQuestionId] = useState<string | null>(null)
-  const [round, setRound] = useState<any>(null)
 
-  useEffect(() => {
-    const fetchQuestions = async () => {
-      if (!roundId) {
-        setLoading(false)
-        return
-      }
-
-      try {
-        setLoading(true)
-
-        // Fetch round details to get categories
-        const roundData = await roundsService.getRound(roundId)
-        setRound(roundData)
-
-        // Fetch game questions
-        const gameQuestionsData = await gameQuestionsService.getGameQuestions(roundId)
-        setRoundQuestions(gameQuestionsData)
-
-        // Fetch the actual question details
-        if (gameQuestionsData.length > 0) {
-          const questionIds = gameQuestionsData.map(rq => rq.question)
-
-          // We need to fetch questions one by one since PocketBase doesn't support IN queries easily
-          const questionPromises = questionIds.map(async (questionId) => {
-            try {
-              return await questionsService.getQuestionById(questionId)
-            } catch (error) {
-              console.error(`Failed to fetch question ${questionId}:`, error)
-              return null
-            }
-          })
-
-          const fetchedQuestions = await Promise.all(questionPromises)
-          const validQuestions = fetchedQuestions.filter((q): q is Question => q !== null)
-          setQuestions(validQuestions)
-        }
-      } catch (error) {
-        console.error('Failed to fetch round questions:', error)
-      } finally {
-        setLoading(false)
-      }
+  const fetchQuestions = useCallback(async () => {
+    if (!roundId) {
+      setLoading(false)
+      return
     }
-
-    fetchQuestions()
-  }, [roundId])
-
-  const handleRecycleQuestion = async (roundQuestionId: string) => {
-    if (!round) return
-
-    try {
-      setRecyclingQuestionId(roundQuestionId)
-
-      // Step 1: Get a new random question
-      const newQuestion = await questionsService.getRandomQuestions(1)
-
-      if (newQuestion.length === 0) {
-        console.warn('No new questions available')
-        return
-      }
-
-      // Step 2: Find the current round question to get its sequence
-      const currentRoundQuestion = roundQuestions.find(rq => rq.id === roundQuestionId)
-      if (!currentRoundQuestion) {
-        console.error('Could not find current round question')
-        return
-      }
-
-      // Step 3: Update the existing game_questions record to "deactivate" it
-      await gameQuestionsService.updateGameQuestion(roundQuestionId, {
-        game: null,
-        round: null,
-        sequence: 0
-      })
-
-      // Step 4: Create a new game_questions record with the new question
-      await gameQuestionsService.createGameQuestion({
-        host: currentRoundQuestion.host,
-        game: currentRoundQuestion.game,
-        round: currentRoundQuestion.round,
-        question: newQuestion[0].id,
-        sequence: currentRoundQuestion.sequence,
-        category_name: newQuestion[0].category
-      })
-
-      // Step 5: Refresh the questions list
-      await fetchQuestions()
-    } catch (error) {
-      console.error('Failed to recycle question:', error)
-    } finally {
-      setRecyclingQuestionId(null)
-    }
-  }
-
-  // Extracted fetch logic for reuse
-  const fetchQuestions = async () => {
-    if (!roundId) return
-
     try {
       setLoading(true)
-
-      // Fetch round details to get categories
-      const roundData = await roundsService.getRound(roundId)
-      setRound(roundData)
-
-      // Fetch game questions
-      const gameQuestionsData = await gameQuestionsService.getGameQuestions(roundId)
-      setRoundQuestions(gameQuestionsData)
-
-      // Fetch the actual question details
-      if (gameQuestionsData.length > 0) {
-        const questionIds = gameQuestionsData.map(rq => rq.question)
-
-        // We need to fetch questions one by one since PocketBase doesn't support IN queries easily
-        const questionPromises = questionIds.map(async (questionId) => {
-          try {
-            return await questionsService.getQuestionById(questionId)
-          } catch (error) {
-            console.error(`Failed to fetch question ${questionId}:`, error)
-            return null
-          }
-        })
-
-        const fetchedQuestions = await Promise.all(questionPromises)
-        const validQuestions = fetchedQuestions.filter((q): q is Question => q !== null)
-        setQuestions(validQuestions)
-      }
+      const records = await gameQuestionsService.getGameQuestions(roundId)
+      setRoundQuestions(records)
+      const details = await Promise.all(records.map(async record => {
+        try {
+          return await questionsService.getQuestionById(record.question)
+        } catch (error) {
+          console.error(`Failed to fetch question ${record.question}:`, error)
+          return null
+        }
+      }))
+      setQuestions(details.filter((question): question is Question => question !== null))
     } catch (error) {
       console.error('Failed to fetch round questions:', error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [roundId])
+
+  useEffect(() => { void fetchQuestions() }, [fetchQuestions])
 
   // Combine round questions with their question details
   const questionsWithDetails = roundQuestions.map(rq => {
@@ -219,7 +109,7 @@ export default function QuestionsList({ roundId, roundTitle }: QuestionsListProp
                         roundQuestion.questionDetails.difficulty === 'medium' ? 'bg-[#fef3c7] dark:bg-yellow-950/40 text-[#92400e] dark:text-yellow-400 border-[#fde68a] dark:border-yellow-900/50' :
                         'bg-[#fee2e2] dark:bg-red-950/40 text-[#991b1b] dark:text-red-400 border-[#fecaca] dark:border-red-900/50'
                       }`}>
-                        {roundQuestion.questionDetails.difficulty}{roundQuestion.questionDetails.level ? ` ${roundQuestion.questionDetails.level}` : ''}
+                        {roundQuestion.questionDetails.difficulty}{roundQuestion.questionDetails.level != null && roundQuestion.questionDetails.level !== '' ? ` ${roundQuestion.questionDetails.level}` : ''}
                       </span>
                     )}
                   </div>
@@ -259,20 +149,9 @@ export default function QuestionsList({ roundId, roundTitle }: QuestionsListProp
                     );
                   })()}
                 </div>
-                <button
-                  onClick={() => handleRecycleQuestion(roundQuestion.id)}
-                  disabled={recyclingQuestionId === roundQuestion.id}
-                  className="w-8 h-8 flex items-center justify-center rounded-md border border-[#e5e5e5] dark:border-slate-700 text-[#737373] dark:text-slate-400 hover:bg-[#fafafa] dark:hover:bg-slate-700 hover:border-[#d4d4d4] dark:hover:border-slate-600 hover:text-[#0a0a0a] dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Replace with a new question"
-                >
-                  {recyclingQuestionId === roundQuestion.id ? (
-                    <div className="animate-spin">
-                      <RotateCcw className="h-4 w-4" />
-                    </div>
-                  ) : (
-                    <RotateCcw className="h-4 w-4" />
-                  )}
-                </button>
+                {roundQuestion.questionDetails && (
+                  <ReplaceQuestionButton gameQuestion={roundQuestion} question={roundQuestion.questionDetails} onReplaced={() => void fetchQuestions()} />
+                )}
               </div>
             ))}
           </div>

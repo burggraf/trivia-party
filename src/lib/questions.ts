@@ -11,12 +11,47 @@ export interface Question {
   answer_b: string;
   answer_c: string;
   answer_d: string;
-  level?: string;
+  level?: string | number;
   metadata?: string;
   imported_at: string;
 }
 
 export const questionsService = {
+  async getDifficultyLevels(): Promise<number[]> {
+    const [lowest, highest] = await Promise.all([
+      pb.collection('questions').getList<Question>(1, 1, { sort: 'level', fields: 'level', skipTotal: true, requestKey: null }),
+      pb.collection('questions').getList<Question>(1, 1, { sort: '-level', fields: 'level', skipTotal: true, requestKey: null }),
+    ]);
+    if (!lowest.items.length || !highest.items.length) return [];
+    const min = Number(lowest.items[0].level);
+    const max = Number(highest.items[0].level);
+    if (!Number.isInteger(min) || !Number.isInteger(max) || max < min) {
+      throw new Error('Unable to determine difficulty levels.');
+    }
+    return Array.from({ length: max - min + 1 }, (_, index) => min + index);
+  },
+
+  async getReplacementQuestion(currentQuestionId: string, levels: number[]): Promise<Question> {
+    const hostId = pb.authStore.record?.id;
+    if (!hostId) throw new Error('User not authenticated.');
+    if (!levels.length || levels.some(level => !Number.isInteger(level))) {
+      throw new Error('Select at least one valid difficulty level.');
+    }
+    const levelFilter = levels.map(level => `level = ${level}`).join(' || ');
+    const candidates = await pb.collection('questions').getList<Question>(1, 10, {
+      filter: pb.filter(`(${levelFilter}) && id != {:current}`, { current: currentQuestionId }),
+      sort: '@random', skipTotal: true,
+    });
+    // shortcut: match generation's latest-500 reuse protection; query full history if lifetime uniqueness is needed.
+    const used = await pb.collection('game_questions').getList<{ question: string }>(1, 500, {
+      filter: pb.filter('host = {:host}', { host: hostId }), sort: '-created', skipTotal: true,
+    });
+    const usedIds = new Set([currentQuestionId, ...used.items.map(record => record.question)]);
+    const replacement = candidates.items.find(question => !usedIds.has(question.id));
+    if (!replacement) throw new Error('No unused questions found for the selected levels. Choose different levels and try again.');
+    return replacement;
+  },
+
   async getCategories(): Promise<string[]> {
     try {
       // Get a sample of questions to extract unique categories
